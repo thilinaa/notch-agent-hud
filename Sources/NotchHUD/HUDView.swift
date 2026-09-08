@@ -954,7 +954,6 @@ struct HUDView: View {
             }
         }
         .padding(.vertical, 13)
-        .overlay(alignment: .top) { HUDStyle.line.frame(height: 1) }
         .help(g.text + "\nChecks the saved gh CLI default, not Git user.email, SSH keys, or session token overrides.")
     }
 }
