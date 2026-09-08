@@ -114,7 +114,15 @@ final class HUDPanelController {
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        panel.contentView = NSHostingView(rootView: HUDRoot(inner: view))
+        // The hosting view must fill the window and nothing more. Left to its
+        // defaults it also reports the SwiftUI content's ideal size as an
+        // intrinsic size; when that exceeds the fixed window (many attention
+        // cards), Auto Layout grows the view past the top edge and the pill
+        // ends up above the screen.
+        let hosting = NSHostingView(rootView: HUDRoot(inner: view))
+        hosting.sizingOptions = []
+        hosting.autoresizingMask = [.width, .height]
+        panel.contentView = hosting
 
         applyFrame()
         panel.orderFrontRegardless()
