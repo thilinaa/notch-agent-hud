@@ -120,7 +120,7 @@ Everything stays on your Mac. The only network call is to `api.anthropic.com` fo
 
 ## Build from source
 
-Requires Xcode 16 or newer (Swift 5.10) on macOS 14 or newer.
+Requires Xcode 26 or newer (the panel uses the macOS 26 glass effects behind an availability check, so the SDK must be present). The app itself runs on macOS 14 or newer.
 
 ```sh
 git clone https://github.com/thilinaa/notch-agent-hud.git
