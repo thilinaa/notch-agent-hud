@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | tail -1)"
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Assemble app bundle (ad-hoc signed)
+        run: SIGN_IDENTITY=- ./scripts/make-app.sh

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleExecutable</key><string>NotchHUD</string>
+    <key>CFBundleIdentifier</key><string>io.thilina.notchhud</string>
+    <key>CFBundleName</key><string>NotchHUD</string>
+    <key>CFBundleDisplayName</key><string>NotchHUD</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <!-- Version fields are stamped by scripts/make-app.sh from the git tag. -->
+    <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+    <key>CFBundleVersion</key><string>__BUILD__</string>
+    <key>LSMinimumSystemVersion</key><string>14.0</string>
+    <key>LSUIElement</key><true/>
+    <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSHumanReadableCopyright</key><string>MIT License</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key><string>io.thilina.notchhud</string>
+            <key>CFBundleURLSchemes</key><array><string>notchhud</string></array>
+        </dict>
+    </array>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>NotchHUD asks your terminal to bring the tab of the session you clicked to the front.</string>
+</dict>
+</plist>
