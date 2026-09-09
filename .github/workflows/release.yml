@@ -31,7 +31,18 @@ jobs:
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
 
+      - name: Check for signing secrets
+        id: check
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_P12 }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "::notice::No signing secrets configured; skipping the automated release. Publish with scripts/release.sh and gh release create instead."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Import Developer ID certificate
+        if: steps.check.outputs.skip != 'true'
         env:
           P12_BASE64: ${{ secrets.DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
@@ -49,6 +60,7 @@ jobs:
           rm cert.p12
 
       - name: Store notarization credentials
+        if: steps.check.outputs.skip != 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -58,9 +70,11 @@ jobs:
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
 
       - name: Build, notarize, package
+        if: steps.check.outputs.skip != 'true'
         run: ./scripts/release.sh "${GITHUB_REF_NAME}"
 
       - name: Publish GitHub Release
+        if: steps.check.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: |
