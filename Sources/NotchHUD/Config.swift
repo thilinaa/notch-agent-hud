@@ -136,11 +136,14 @@ struct HUDPreferences: Codable, Equatable {
     /// Read the active login's OAuth token from the Keychain to fetch exact
     /// usage. Off means estimates only and no Keychain access at all.
     var useUsageAPI = true
+    /// Expand the panel when the pointer rests on the pill. Off (default): the
+    /// pill is click-to-open and stays open until clicked again.
+    var openOnHover = false
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI
+        case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
     }
 
     init(from decoder: Decoder) throws {
@@ -152,6 +155,7 @@ struct HUDPreferences: Codable, Equatable {
         attentionBreaksThrough = try c.decodeIfPresent(Bool.self, forKey: .attentionBreaksThrough) ?? true
         onboardingCompleted = try c.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         useUsageAPI = try c.decodeIfPresent(Bool.self, forKey: .useUsageAPI) ?? true
+        openOnHover = try c.decodeIfPresent(Bool.self, forKey: .openOnHover) ?? false
     }
 }
 

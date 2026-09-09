@@ -34,6 +34,8 @@ final class SettingsAndSetupTests: XCTestCase {
         XCTAssertFalse(loaded.preferences.onboardingCompleted)
         XCTAssertTrue(loaded.needsOnboarding)
         XCTAssertEqual(HUDConfig.parseV2(["subscriptions": []]).preferences, HUDPreferences())
+        XCTAssertFalse(HUDPreferences().openOnHover, "click-to-open is the default")
+        XCTAssertTrue(HUDConfig.parseV2(["subscriptions": [], "preferences": ["openOnHover": true]]).preferences.openOnHover)
 
         // A v2 file written before preferences existed, with named accounts: no setup nag.
         let early: [String: Any] = ["subscriptions": [[

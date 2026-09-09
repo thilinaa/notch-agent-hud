@@ -23,7 +23,7 @@
 ## What it does
 
 - **A pill around the notch** (or a small capsule under the menu bar on other displays) shows `2 working · 1 needs you` at a glance. The working dot pulses while agents are busy.
-- **Hover to expand.** Sessions that need you come first, as cards with the full request text and an *Open in Ghostty* button. Working and completed sessions follow. Click any row to jump to the exact terminal tab.
+- **Click to expand.** Sessions that need you come first, as cards with the full request text and an *Open in Ghostty* button. Working and completed sessions follow. Click any row to jump to the exact terminal tab.
 - **Usage per subscription.** 5-hour and weekly windows for every Claude account you own and for Codex, with reset times. The active Claude login uses the same endpoint as `/usage` inside Claude Code, so the numbers are exact.
 - **GitHub account guard.** Reads the active `gh` account and warns when it does not match the one your rules expect for the repository you are working in, with a one-click *Switch*.
 - **Multiple accounts, your labels.** Two work accounts, two personal ones, whatever you have. You name them; the app never guesses what a label means.
@@ -63,7 +63,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
   <img src="docs/screenshots/settings-subscriptions.png" width="560" alt="Subscriptions settings">
 </p>
 
-- **General** — density (*Cozy*, *Compact*, or *Minimal*, one line per session so long lists fit), appearance (System, Light, Dark), the accent that colors the working indicator, and **usage-only mode**: the pill shows each subscription's tightest window as a colored dot and percentage, and the panel shows just the usage grid and the GitHub guard. Sessions that need you still break through unless you silence that too.
+- **General** — density (*Cozy*, *Compact*, or *Minimal*, one line per session so long lists fit), open on hover (off by default: the pill is click-to-open and stays open until clicked again), appearance (System, Light, Dark), the accent that colors the working indicator, and **usage-only mode**: the pill shows each subscription's tightest window as a colored dot and percentage, and the panel shows just the usage grid and the GitHub guard. Sessions that need you still break through unless you silence that too.
 - **Subscriptions** — the logins you own. Rename each in your own words, pick a lane color, hide a lane without deleting it, remove accounts you no longer use. Logins the HUD has seen but you have not named appear under *Seen on this Mac* with a one-click *Name it*. Codex is listed once it is detected.
 - **Rules** — folder and GitHub-owner rules, each with an expected subscription and an expected `gh` account. Owner rules beat folder rules, and among folders the longest match wins. Folders come from a picker or from suggestions based on where your sessions actually run.
 - **Advanced** — hook status with a one-click installer, Accessibility status, a switch for exact usage from Anthropic's API (reads the token Claude Code keeps in the Keychain; off means estimates only and no Keychain access), the default terminal, the Codex app bundle id, and the relay port.
@@ -94,7 +94,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
   "preferences": {
     "density": "cozy", "appearance": "system", "accent": "blue",
     "usageOnly": false, "attentionBreaksThrough": true, "onboardingCompleted": true,
-    "useUsageAPI": true
+    "useUsageAPI": true, "openOnHover": false
   }
 }
 ```

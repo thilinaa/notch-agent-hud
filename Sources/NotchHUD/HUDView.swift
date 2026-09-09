@@ -327,6 +327,8 @@ struct HUDView: View {
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.45 : 0.22), radius: 22, y: 12)
         .onHover { value in
             inside = value
+            // Click-to-open by default; hovering only matters when the user asked for it.
+            guard prefs.openOnHover else { return }
             collapseTask?.cancel()
             if value { expanded = true }
             else { scheduleCollapse() }
@@ -506,18 +508,21 @@ struct HUDView: View {
                 }
             }
             Spacer()
-            Button {
-                pinned.toggle()
-                if pinned { collapseTask?.cancel() } else { scheduleCollapse() }
-            } label: {
-                Image(systemName: pinned ? "pin.fill" : "pin")
-                    .font(.system(size: 13)).frame(width: 32, height: 32)
-                    .foregroundStyle(pinned ? accentColor : HUDStyle.secondary)
-                    .background(pinned ? HUDStyle.raised : .clear, in: RoundedRectangle(cornerRadius: 8))
+            // Pinning only means something when hovering can collapse the panel.
+            if prefs.openOnHover {
+                Button {
+                    pinned.toggle()
+                    if pinned { collapseTask?.cancel() } else { scheduleCollapse() }
+                } label: {
+                    Image(systemName: pinned ? "pin.fill" : "pin")
+                        .font(.system(size: 13)).frame(width: 32, height: 32)
+                        .foregroundStyle(pinned ? accentColor : HUDStyle.secondary)
+                        .background(pinned ? HUDStyle.raised : .clear, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .help(pinned ? "Unpin panel" : "Pin panel open")
+                .accessibilityLabel(pinned ? "Unpin panel" : "Pin panel open")
             }
-            .buttonStyle(.plain)
-            .help(pinned ? "Unpin panel" : "Pin panel open")
-            .accessibilityLabel(pinned ? "Unpin panel" : "Pin panel open")
         }
         .padding(.bottom, compact ? 12 : 20)
 

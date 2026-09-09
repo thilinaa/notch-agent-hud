@@ -233,6 +233,13 @@ struct GeneralPane: View {
                     .pickerStyle(.segmented).labelsHidden().frame(width: 240)
                 }
                 SettingsDivider()
+                SettingRow(title: "Open on hover", detail: "Off: click the pill to open and close the panel. On: it opens when the pointer rests on the pill and closes when it leaves, with a pin to hold it.") {
+                    Toggle("", isOn: Binding(
+                        get: { prefs.openOnHover },
+                        set: { new in configStore.updatePreferences { $0.openOnHover = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                }
+                SettingsDivider()
                 SettingRow(title: "Appearance", detail: "The notch pill itself stays black; the panel follows this.") {
                     Picker("", selection: Binding(
                         get: { prefs.appearance },

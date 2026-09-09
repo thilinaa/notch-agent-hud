@@ -261,7 +261,7 @@ struct OnboardingView: View {
     private var done: some View {
         VStack(alignment: .leading, spacing: 18) {
             heading("You're set",
-                    "The pill sits at the top of every screen: flush around the notch on the MacBook display, a small capsule under the menu bar elsewhere. Hover to expand it, click to pin it open.")
+                    "The pill sits at the top of every screen: flush around the notch on the MacBook display, a small capsule under the menu bar elsewhere. Click it to open the panel and click again to close; Settings can switch it to open on hover instead.")
             SettingsSection(title: "Summary") {
                 summaryRow("Hooks", hookStatus == .installed ? "installed" : "not installed", ok: hookStatus == .installed)
                 SettingsDivider()
