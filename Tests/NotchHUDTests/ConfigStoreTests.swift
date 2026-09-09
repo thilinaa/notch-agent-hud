@@ -15,7 +15,7 @@ final class ConfigStoreTests: XCTestCase {
         XCTAssertTrue(store.config.needsOnboarding)
         store.config.subscriptions.append(HUDConfig.defaultCodex)
         let a = store.addClaudeAccount(email: " Me@Company.io ")
-        let b = store.addClaudeAccount(email: "me@gmail.com", label: "Home")
+        let b = store.addClaudeAccount(email: "me@example.com", label: "Home")
         XCTAssertEqual(a.email, "me@company.io")
         XCTAssertEqual(a.label, "Me", "default label is the email's local part")
         XCTAssertEqual(b.label, "Home")
