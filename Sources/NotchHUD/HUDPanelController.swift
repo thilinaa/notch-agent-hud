@@ -4,7 +4,7 @@ import Combine
 
 /// The floating margin around the pill so SwiftUI shadows/glows aren't clipped
 /// by the window bounds. Transparent pixels pass clicks through.
-private let shadowMargin: CGFloat = 24
+private let shadowMargin: CGFloat = 72
 
 private struct HUDRoot: View {
     let inner: HUDView

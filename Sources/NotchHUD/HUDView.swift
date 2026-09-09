@@ -322,7 +322,9 @@ struct HUDView: View {
         .background { panelSurface }
         .clipShape(shape)
         .overlay(shape.strokeBorder(hasNotch ? .clear : HUDStyle.line, lineWidth: 1))
-        .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
+        // Soft ambient shadow. The window keeps a wide transparent margin so
+        // the blur fades to nothing before the window edge cuts it off.
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.45 : 0.22), radius: 22, y: 12)
         .onHover { value in
             inside = value
             collapseTask?.cancel()
