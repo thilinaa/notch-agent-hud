@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] in self?.applyAppearance($0) }
             .store(in: &cancellables)
 
-        try? FileManager.default.createDirectory(atPath: NSHomeDirectory() + "/.notchhud", withIntermediateDirectories: true,
+        try? FileManager.default.createDirectory(atPath: Home.directory + "/.notchhud", withIntermediateDirectories: true,
                                                  attributes: [.posixPermissions: 0o700])
         server = HookServer(port: config.port, onEvent: { obj in
             Task { @MainActor in store.apply(hookEvent: obj) }

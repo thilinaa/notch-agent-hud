@@ -131,6 +131,8 @@ open build/NotchHUD.app
 ./scripts/install-hooks.sh # optional: install the Claude Code hooks from the terminal
 ```
 
+Set `NOTCHHUD_HOME=/some/dir` when launching to point the whole app at another home directory (config, sessions, Claude and Codex files, `gh` config); handy for testing and for screenshots that must not show your real data.
+
 `make-app.sh` signs with a Developer ID certificate if you have one, otherwise with an Apple Development certificate, otherwise ad-hoc. Ad-hoc builds lose the Accessibility grant on every rebuild, which is why a real certificate is preferred for day-to-day development.
 
 ### Cutting a release

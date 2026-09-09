@@ -603,9 +603,9 @@ struct RulesPane: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Use folder"
-        panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
+        panel.directoryURL = URL(fileURLWithPath: Home.directory)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let home = NSHomeDirectory()
+        let home = Home.directory
         var path = url.path
         if path.hasPrefix(home) { path = "~" + path.dropFirst(home.count) }
         if !rules.contains(where: { $0.kind == .pathPrefix && $0.value == path }) {

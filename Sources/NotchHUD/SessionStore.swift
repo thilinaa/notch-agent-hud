@@ -13,7 +13,7 @@ final class SessionStore: ObservableObject {
     private var configSink: AnyCancellable?
 
     private var storeURL: URL {
-        URL(fileURLWithPath: NSHomeDirectory() + "/.notchhud/sessions.json")
+        URL(fileURLWithPath: Home.directory + "/.notchhud/sessions.json")
     }
 
     init(configStore: ConfigStore) {
@@ -303,7 +303,7 @@ final class SessionStore: ObservableObject {
 
     private func loadSessions() {
         // Migrate from the old recents-only file if present.
-        let legacy = URL(fileURLWithPath: NSHomeDirectory() + "/.notchhud/recent.json")
+        let legacy = URL(fileURLWithPath: Home.directory + "/.notchhud/recent.json")
         let url = FileManager.default.fileExists(atPath: storeURL.path) ? storeURL : legacy
         guard let data = try? Data(contentsOf: url),
               let stored = try? JSONDecoder().decode([AgentSession].self, from: data) else { return }

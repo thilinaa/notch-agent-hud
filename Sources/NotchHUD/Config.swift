@@ -1,5 +1,17 @@
 import Foundation
 
+/// Every path the app reads or writes under the user's home goes through
+/// here. `NOTCHHUD_HOME` points the whole app at another directory — used for
+/// screenshots and manual testing so real config, sessions and Codex history
+/// never leak into a demo. Not a sandbox: `security`, `git` and `gh` still see
+/// the real user.
+enum Home {
+    static let directory: String = {
+        let env = ProcessInfo.processInfo.environment["NOTCHHUD_HOME"] ?? ""
+        return env.isEmpty ? NSHomeDirectory() : env
+    }()
+}
+
 // MARK: - Subscriptions and repo rules
 //
 // A subscription is a login the user owns (a Claude account, or Codex), named
@@ -157,7 +169,7 @@ struct HUDConfig: Equatable {
     var preferences = HUDPreferences()
 
     static var defaultURL: URL {
-        URL(fileURLWithPath: NSHomeDirectory() + "/.notchhud/config.json")
+        URL(fileURLWithPath: Home.directory + "/.notchhud/config.json")
     }
 
     /// True until the setup flow has been completed (or a v1 config migrated,
@@ -380,7 +392,7 @@ struct HUDConfig: Equatable {
             }
         }
         guard !path.isEmpty else { return nil }
-        let home = NSHomeDirectory()
+        let home = Home.directory
         var best: (rule: RepoRule, length: Int)?
         for rule in rules where rule.kind == .pathPrefix && predicate(rule) {
             var prefix = rule.value.hasPrefix("~") ? home + rule.value.dropFirst() : rule.value

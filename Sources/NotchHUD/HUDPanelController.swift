@@ -296,7 +296,7 @@ enum FocusHelper {
     /// Appends to ~/.notchhud/focus.log, a diagnostic log for terminal focus.
     /// Capped at 256 KB: once it grows past that it starts over.
     nonisolated static func log(_ line: String) {
-        let path = NSHomeDirectory() + "/.notchhud/focus.log"
+        let path = Home.directory + "/.notchhud/focus.log"
         let stamp = ISO8601DateFormatter().string(from: Date())
         let entry = "\(stamp) \(line)\n"
         if let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int, size > 256 * 1024 {

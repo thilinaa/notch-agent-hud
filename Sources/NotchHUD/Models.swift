@@ -58,7 +58,7 @@ struct AgentSession: Identifiable, Codable {
     }
 
     var shortPath: String {
-        let home = NSHomeDirectory()
+        let home = Home.directory
         var p = cwd
         if p.hasPrefix(home) { p = "~" + p.dropFirst(home.count) }
         // Show at most the last three components for long paths.

@@ -56,7 +56,7 @@ final class UsageTracker: ObservableObject {
 
     private let horizon: TimeInterval = 12 * 3600
     private let blockLength: TimeInterval = 5 * 3600
-    private var ceilingURL: URL { URL(fileURLWithPath: NSHomeDirectory() + "/.notchhud/usage-ceilings.json") }
+    private var ceilingURL: URL { URL(fileURLWithPath: Home.directory + "/.notchhud/usage-ceilings.json") }
 
     init(store: SessionStore) {
         self.store = store
@@ -111,7 +111,7 @@ final class UsageTracker: ObservableObject {
         guard !scanning else { return }  // a slow pass must not overlap the next
         scanning = true
         let fm = FileManager.default
-        let root = NSHomeDirectory() + "/.claude/projects"
+        let root = Home.directory + "/.claude/projects"
         let cutoff = Date().addingTimeInterval(-horizon)
 
         var files: [String] = []
@@ -245,7 +245,7 @@ final class UsageTracker: ObservableObject {
     /// weekly windows. Read the freshest one from the newest rollout files.
     nonisolated private static func scanCodexLimits() -> [CodexWindow] {
         let fm = FileManager.default
-        let root = NSHomeDirectory() + "/.codex/sessions"
+        let root = Home.directory + "/.codex/sessions"
         let cutoff = Date().addingTimeInterval(-7 * 86400)
 
         // Newest rollout files by mtime, at most 6.

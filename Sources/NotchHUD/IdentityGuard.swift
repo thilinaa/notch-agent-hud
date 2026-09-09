@@ -68,7 +68,7 @@ final class IdentityGuard {
         let env = ProcessInfo.processInfo.environment
         let configRoot = env["GH_CONFIG_DIR"]
             ?? env["XDG_CONFIG_HOME"].map { $0 + "/gh" }
-            ?? NSHomeDirectory() + "/.config/gh"
+            ?? Home.directory + "/.config/gh"
         guard let text = try? String(contentsOfFile: configRoot + "/hosts.yml", encoding: .utf8) else { return nil }
         return parseDefaultAccount(text)
     }
@@ -120,7 +120,7 @@ final class IdentityGuard {
     }
 
     nonisolated private static func shortPath(_ path: String) -> String {
-        let home = NSHomeDirectory()
+        let home = Home.directory
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 

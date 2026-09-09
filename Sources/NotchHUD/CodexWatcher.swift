@@ -36,7 +36,7 @@ final class CodexWatcher {
         Task { await scan() }
     }
 
-    private var sessionRoot: String { NSHomeDirectory() + "/.codex/sessions" }
+    private var sessionRoot: String { Home.directory + "/.codex/sessions" }
 
     private func scan() async {
         guard !scanning else { return }
@@ -147,7 +147,7 @@ final class CodexWatcher {
     private var accountCache: (mtime: Date, email: String?)?
 
     private func activeCodexAccount() -> String? {
-        let path = NSHomeDirectory() + "/.codex/auth.json"
+        let path = Home.directory + "/.codex/auth.json"
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
               let mtime = attrs[.modificationDate] as? Date else { return nil }
         if let cached = accountCache, cached.mtime == mtime { return cached.email }

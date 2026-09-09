@@ -10,8 +10,8 @@ import Foundation
 enum HookInstaller {
     static let events = ["SessionStart", "UserPromptSubmit", "Notification", "Stop", "SessionEnd"]
 
-    static var relayPath: String { NSHomeDirectory() + "/.notchhud/notify.sh" }
-    static var settingsPath: String { NSHomeDirectory() + "/.claude/settings.json" }
+    static var relayPath: String { Home.directory + "/.notchhud/notify.sh" }
+    static var settingsPath: String { Home.directory + "/.claude/settings.json" }
 
     enum Status: Equatable {
         case installed
@@ -188,7 +188,7 @@ extension IdentityGuard {
         let env = ProcessInfo.processInfo.environment
         let configRoot = env["GH_CONFIG_DIR"]
             ?? env["XDG_CONFIG_HOME"].map { $0 + "/gh" }
-            ?? NSHomeDirectory() + "/.config/gh"
+            ?? Home.directory + "/.config/gh"
         guard let text = try? String(contentsOfFile: configRoot + "/hosts.yml", encoding: .utf8) else { return [] }
         return parseAllAccounts(text)
     }
@@ -200,7 +200,7 @@ enum RuleSuggestions {
     /// Directory prefixes worth turning into rules: the first two path
     /// components under the home folder for every session directory, most
     /// used first, minus prefixes already covered by a rule.
-    static func pathPrefixes(sessions: [AgentSession], rules: [RepoRule], home: String = NSHomeDirectory()) -> [String] {
+    static func pathPrefixes(sessions: [AgentSession], rules: [RepoRule], home: String = Home.directory) -> [String] {
         // System and tooling folders are never where someone keeps repos.
         let ignored: Set<String> = ["Library", "Applications", "Downloads", "Desktop", "Documents", "Movies", "Music", "Pictures", "Public"]
         var counts: [String: Int] = [:]

@@ -188,7 +188,7 @@ enum AccountDetection {
     /// The account Claude Code is signed in with right now.
     static func activeClaudeEmail() -> String? {
         let env = ProcessInfo.processInfo.environment
-        let dir = env["CLAUDE_CONFIG_DIR"] ?? NSHomeDirectory()
+        let dir = env["CLAUDE_CONFIG_DIR"] ?? Home.directory
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: dir + "/.claude.json")),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let email = (obj["oauthAccount"] as? [String: Any])?["emailAddress"] as? String,
@@ -214,7 +214,7 @@ enum AccountDetection {
 
     /// Codex is on this Mac if it has logged in or has ever run a session.
     static func codexPresent(sessions: [AgentSession]) -> Bool {
-        FileManager.default.fileExists(atPath: NSHomeDirectory() + "/.codex/auth.json")
+        FileManager.default.fileExists(atPath: Home.directory + "/.codex/auth.json")
             || sessions.contains { $0.tool == .codex }
     }
 
