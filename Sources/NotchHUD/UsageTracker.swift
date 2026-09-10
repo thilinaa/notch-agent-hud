@@ -76,6 +76,15 @@ struct WindowUsage {
         return "≈\(tokensText)"
     }
 
+    /// Each per-model cap as a window of its own, sharing this window's reset
+    /// and length, so it can take a meter like the overall figure does.
+    var splitWindows: [(label: String, window: WindowUsage)] {
+        splits.map { split in
+            (split.label, WindowUsage(resetsAt: resetsAt, limitHit: split.percent >= 100,
+                                      percent: split.percent, length: length))
+        }
+    }
+
     /// Like `valueText`, but for the governing figure (a tight per-model cap wins).
     func tightestValueText(_ mode: UsageValueMode) -> String {
         guard let tightestPercent, tightestPercent != percent else { return valueText(mode) }
@@ -382,21 +391,36 @@ final class UsageTracker: ObservableObject {
                 let rlAny = payload["rate_limits"]
                     ?? (payload["info"] as? [String: Any])?["rate_limits"]
                 guard let rl = rlAny as? [String: Any] else { continue }
-                var out: [CodexWindow] = []
-                for (key, label) in [("primary", "5h"), ("secondary", "1w")] {
-                    if let w = rl[key] as? [String: Any],
-                       let pct = w["used_percent"] as? Double,
-                       let resets = w["resets_at"] as? Double {
-                        let resetDate = Date(timeIntervalSince1970: resets)
-                        if resetDate > Date() {  // still-current window only
-                            out.append(CodexWindow(label: label, percent: pct, resetsAt: resetDate))
-                        }
-                    }
-                }
+                let out = codexWindows(from: rl)
                 if !out.isEmpty { return out }
             }
         }
         return []
+    }
+
+    /// Codex names its windows `primary` and `secondary` by position, not by
+    /// length: Plus has a 5-hour primary and a weekly secondary, Pro has only a
+    /// weekly primary. `window_minutes` says which is which; a payload without
+    /// it falls back to the positional reading. Expired windows are dropped.
+    nonisolated static func codexWindows(from rl: [String: Any], now: Date = Date()) -> [CodexWindow] {
+        var out: [CodexWindow] = []
+        for (key, positional) in [("primary", "5h"), ("secondary", "1w")] {
+            guard let w = rl[key] as? [String: Any],
+                  let pct = (w["used_percent"] as? Double) ?? (w["used_percent"] as? Int).map(Double.init),
+                  let resets = (w["resets_at"] as? Double) ?? (w["resets_at"] as? Int).map(Double.init) else { continue }
+            let resetDate = Date(timeIntervalSince1970: resets)
+            guard resetDate > now else { continue }
+            let label: String
+            if let minutes = (w["window_minutes"] as? Double) ?? (w["window_minutes"] as? Int).map(Double.init) {
+                label = minutes <= 12 * 60 ? "5h" : "1w"
+            } else {
+                label = positional
+            }
+            if !out.contains(where: { $0.label == label }) {
+                out.append(CodexWindow(label: label, percent: pct, resetsAt: resetDate))
+            }
+        }
+        return out
     }
 
     private func ingest(events newEvents: [(Date, Int, String, String)],

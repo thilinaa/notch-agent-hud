@@ -905,8 +905,14 @@ struct HUDView: View {
                         if prefs.usageMeter == .rings {
                             usageRings(sub)
                         } else {
-                            usageWindow(sub.fiveHour, name: "5h", accent: sub.lane.accent.color)
+                            if showsFiveHour(sub) {
+                                usageWindow(sub.fiveHour, name: "5h", accent: sub.lane.accent.color)
+                            }
                             usageWindow(sub.weekly, name: "Week", accent: sub.lane.accent.color)
+                            // A per-model weekly cap binds on its own, so it gets its own meter.
+                            ForEach(sub.weekly?.splitWindows ?? [], id: \.label) { split in
+                                usageWindow(split.window, name: split.label, accent: sub.lane.accent.color)
+                            }
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -929,7 +935,7 @@ struct HUDView: View {
                 )
         }
         .padding(.top, 14)
-        .help("Active Claude login and Codex use provider reports. Other Claude accounts use transcript estimates; ≈ indicates tokens, not a percentage.")
+        .help("Active Claude login and Codex use provider reports. Other Claude accounts use transcript estimates; ≈ indicates tokens, not a percentage. A model-named row is that model's own weekly cap, which binds before the overall week does.")
     }
 
     private func usageWindow(_ window: WindowUsage?, name: String, accent: Color) -> some View {
@@ -962,7 +968,6 @@ struct HUDView: View {
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.9)
-            if let w, !w.splits.isEmpty { splitText(w, size: 10) }
             if let pace = w.flatMap(paceText) {
                 Text(pace).font(.system(size: 10)).foregroundStyle(HUDStyle.amber)
                     .lineLimit(1).minimumScaleFactor(0.8)
@@ -971,15 +976,6 @@ struct HUDView: View {
         .padding(.top, 3)
         .help(w.map { windowHelp($0, name: name) } ?? "No current \(name) usage reported")
         .accessibilityElement(children: .combine)
-    }
-
-    /// Per-model caps under the week ("Fable 37%"), amber once one runs hot.
-    private func splitText(_ w: WindowUsage, size: CGFloat) -> some View {
-        let hot = w.splits.contains { $0.percent > 60 }
-        return Text(w.splits.map { $0.valueText(usageValueMode) }.joined(separator: " · "))
-            .font(.system(size: size)).foregroundStyle(hot ? HUDStyle.amber : HUDStyle.secondary)
-            .lineLimit(1).minimumScaleFactor(0.8)
-            .help("Per-model weekly caps. The tightest one binds before the overall week does.")
     }
 
     /// Tick position in the meter's own direction: elapsed time in Used mode,
@@ -1032,6 +1028,12 @@ struct HUDView: View {
                 "Exact numbers last fetched \(ok.formatted(date: .omitted, time: .shortened))." + (failedSince ? " The latest attempt failed; retrying with back-off." : ""))
     }
 
+    /// Codex reports every window it has, so a weekly-only report (the Pro
+    /// plan) means there is no 5-hour window to show, not missing data.
+    private func showsFiveHour(_ sub: SubscriptionUsage) -> Bool {
+        !(sub.lane.provider == .codex && sub.fiveHour == nil && sub.weekly != nil)
+    }
+
     /// Two concentric rings: the 5-hour window outside, the week inside, the
     /// tightest window's percent in the middle. Reset times sit beside it so
     /// a glance at the ring answers "how much", the legend "until when".
@@ -1046,20 +1048,38 @@ struct HUDView: View {
             guard let percent = t.tightestPercent else { return "≈\(t.tokensText)" }
             return usageValueMode == .remaining ? "\(max(0, Int((100 - percent).rounded(.down))))%" : String(format: "%.0f%%", percent)
         }()
+        // The tightest per-model weekly cap takes a third, innermost ring.
+        let split = weekly?.splitWindows.max { $0.window.percent ?? 0 < $1.window.percent ?? 0 }
+        let hasFiveHour = showsFiveHour(sub)
+        let ringCount = (hasFiveHour ? 1 : 0) + 1 + (split == nil ? 0 : 1)
+        let lineWidth: CGFloat = ringCount == 3 ? 4 : 5
+        // Outermost first; each ring steps in by its width plus a gap.
+        let diameters: [CGFloat] = ringCount == 3 ? [56, 42, 28] : [56, 40]
+        var next = 0
+        func nextDiameter() -> CGFloat { defer { next += 1 }; return diameters[min(next, diameters.count - 1)] }
+        let fiveHourDiameter = hasFiveHour ? nextDiameter() : 0
+        let weeklyDiameter = nextDiameter()
+        let splitDiameter = split == nil ? 0 : nextDiameter()
         return HStack(alignment: .center, spacing: 10) {
             ZStack {
-                ring(fiveHour, accent: accent, diameter: 54, lineWidth: 5)
-                ring(weekly, accent: accent.opacity(0.55), diameter: 38, lineWidth: 5)
+                if hasFiveHour { ring(fiveHour, accent: accent, diameter: fiveHourDiameter, lineWidth: lineWidth) }
+                ring(weekly, accent: hasFiveHour ? accent.opacity(0.55) : accent, diameter: weeklyDiameter, lineWidth: lineWidth)
+                if let split {
+                    ring(split.window, accent: accent.opacity(0.35), diameter: splitDiameter, lineWidth: lineWidth)
+                }
                 Text(centerText)
                     .font(.system(size: centerText.count > 3 ? 7 : 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(tightest?.limitHit == true ? Palette.mismatch : HUDStyle.text)
-                    .lineLimit(1).minimumScaleFactor(0.7).frame(width: 26)
+                    .lineLimit(1).minimumScaleFactor(0.6).frame(width: split == nil ? 26 : 20)
             }
-            .frame(width: 54, height: 54)
+            .frame(width: 56, height: 56)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                ringLegend(fiveHour, name: "5h", swatch: accent)
-                ringLegend(weekly, name: "Week", swatch: accent.opacity(0.55))
+                if hasFiveHour { ringLegend(fiveHour, name: "5h", swatch: accent) }
+                ringLegend(weekly, name: "Week", swatch: hasFiveHour ? accent.opacity(0.55) : accent)
+                if let split {
+                    ringLegend(split.window, name: split.label, swatch: accent.opacity(0.35))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1099,7 +1119,6 @@ struct HUDView: View {
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 9)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.8)
-            if let w, !w.splits.isEmpty { splitText(w, size: 9) }
             if let pace = w.flatMap(paceText) {
                 Text(pace).font(.system(size: 9)).foregroundStyle(HUDStyle.amber)
                     .lineLimit(1).minimumScaleFactor(0.8)
