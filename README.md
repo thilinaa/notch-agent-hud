@@ -115,7 +115,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
 - `accent` is one of `blue violet teal green amber rose graphite`. Amber and red are reserved for state (attention, limits) and never used as a lane color's meaning.
 - A login not listed under `subscriptions` shows up as an unlabeled lane named after the email's local part.
 - `usageValue` is `used` or `remaining`; `usageMeter` is `bars` or `rings`; `alertThreshold` is a percent from 1 to 99. Warm-up `times` are `HH:mm` in local time and `graceMinutes` (5 to 720) is how late a missed slot may still run.
-- Files written next to it: `sessions.json` (tracked sessions), `usage-ceilings.json` (learned limits), `usage-alerts.json` (which alerts have fired), `warmup-runs.json` (warm-up outcomes), `notify.sh` (the hook relay), `focus.log` (terminal-focus diagnostics), and `warmup/`, the scratch directory the warm-up runs in.
+- Files written next to it: `sessions.json` (tracked sessions), `usage-ceilings.json` (learned limits), `usage-alerts.json` (which alerts have fired), `notifications.log` (permission answers and post results, for when a notification does not show), `warmup-runs.json` (warm-up outcomes), `notify.sh` (the hook relay), `focus.log` (terminal-focus diagnostics), and `warmup/`, the scratch directory the warm-up runs in.
 - `GET http://127.0.0.1:48618/state` returns the current sessions, usage, subscriptions and guard as JSON. It is bound to localhost only, but note that it includes your account emails and session paths in clear text for any local process that asks.
 
 Older v1 files (`claudeAccounts`, `pathAccounts`, `ownerAccounts`) are migrated automatically on first launch and kept as `config.v1.backup.json`.

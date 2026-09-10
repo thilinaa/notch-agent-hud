@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: preview == "light" ? .aqua : .darkAqua)
         }
         #endif
+        Notifier.install()
         let configStore = ConfigStore()
         let config = configStore.config
         let store = SessionStore(configStore: configStore)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Combine
 import UserNotifications
@@ -84,9 +85,41 @@ enum Notifier {
         Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app"
     }
 
-    static func requestPermission() {
+    private static let delegate = Delegate()
+
+    /// Appends to ~/.notchhud/notifications.log so a "nothing showed up" report
+    /// can be diagnosed without a debugger: permission answers, post errors.
+    nonisolated static func diag(_ message: String) {
+        let line = "\(Date().formatted(.iso8601)) \(message)\n"
+        let url = URL(fileURLWithPath: Home.directory + "/.notchhud/notifications.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            handle.write(Data(line.utf8))
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Call once at launch. Without a delegate macOS hides banners while the
+    /// app is frontmost, which is exactly when Settings' test button is pressed.
+    static func install() {
         guard available else { return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().delegate = delegate
+        diag("install: bundle=\(Bundle.main.bundleIdentifier ?? "nil") path=\(Bundle.main.bundlePath)")
+        NotificationStatus.shared.refresh()
+    }
+
+    static func requestPermission(then completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
+        guard available else { return }
+        diag("requestAuthorization: asking")
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            diag("requestAuthorization: granted=\(granted) error=\(error?.localizedDescription ?? "none")")
+            Task { @MainActor in
+                NotificationStatus.shared.refresh()
+                completion(granted)
+            }
+        }
     }
 
     static func deliver(title: String, body: String, thread: String, id: String = UUID().uuidString) {
@@ -97,14 +130,78 @@ enum Notifier {
         content.threadIdentifier = thread
         content.sound = .default
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { _ in }
+        UNUserNotificationCenter.current().add(request) { error in
+            diag("post \"\(title)\": \(error.map { "error: \($0.localizedDescription)" } ?? "accepted")")
+        }
     }
 
-    /// Settings → "Send a test" so people can see the permission is in place.
+    /// Settings → "Send a test". Asks first if macOS has not been asked yet,
+    /// so the test lands once the answer is in rather than vanishing.
     static func deliverTest() {
-        requestPermission()
-        deliver(title: "NotchHUD alerts are on", body: "You will hear when a subscription nears its limit, hits it, or gets its window back.", thread: "test")
+        guard available else { return }
+        let post = { deliver(title: "NotchHUD alerts are on",
+                             body: "You will hear when a subscription nears its limit, hits it, or gets its window back.",
+                             thread: "test") }
+        diag("test: checking settings")
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Task { @MainActor in
+                diag("test: authorization=\(settings.authorizationStatus.rawValue) alerts=\(settings.alertSetting.rawValue)")
+                switch settings.authorizationStatus {
+                case .notDetermined: requestPermission { granted in if granted { post() } }
+                case .denied: NotificationStatus.shared.refresh()
+                default: post()
+                }
+            }
+        }
     }
+
+    /// System Settings → Notifications, on this app.
+    static func openSystemSettings() {
+        let id = Bundle.main.bundleIdentifier ?? "io.thilina.notchhud"
+        let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)")!
+        NSWorkspace.shared.open(url)
+    }
+
+    private final class Delegate: NSObject, UNUserNotificationCenterDelegate {
+        func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+            Notifier.diag("willPresent \"\(notification.request.content.title)\" while frontmost")
+            completionHandler([.banner, .list, .sound])
+        }
+    }
+}
+
+/// Whether macOS lets NotchHUD notify, for the Alerts section in Settings.
+@MainActor
+final class NotificationStatus: ObservableObject {
+    static let shared = NotificationStatus()
+    @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var known = false
+
+    func refresh() {
+        guard Notifier.available else { return }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            Task { @MainActor in
+                Notifier.diag("status: authorization=\(settings.authorizationStatus.rawValue)")
+                self.authorization = settings.authorizationStatus
+                self.known = true
+            }
+        }
+    }
+
+    var text: String {
+        guard Notifier.available else { return "Available when NotchHUD runs as an app bundle." }
+        guard known else { return "Checking…" }
+        switch authorization {
+        case .authorized: return "Allowed"
+        case .provisional: return "Allowed quietly (no banners until you allow them)"
+        case .denied: return "Turned off for NotchHUD in System Settings → Notifications"
+        case .notDetermined: return "macOS has not asked yet. Send a test to ask."
+        @unknown default: return "Unknown"
+        }
+    }
+
+    var ok: Bool { authorization == .authorized || authorization == .provisional }
 }
 
 /// Watches the usage tracker and turns policy decisions into notifications.

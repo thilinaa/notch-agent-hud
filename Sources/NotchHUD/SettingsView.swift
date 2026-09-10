@@ -215,6 +215,7 @@ struct AccentSwatches: View {
 struct GeneralPane: View {
     @ObservedObject var configStore: ConfigStore
     @ObservedObject private var warmup = WarmupScheduler.shared
+    @ObservedObject private var notifications = NotificationStatus.shared
     private var prefs: HUDPreferences { configStore.config.preferences }
     private var schedule: WarmupSchedule { configStore.config.warmup }
 
@@ -316,10 +317,18 @@ struct GeneralPane: View {
                 }
                 .opacity(prefs.usageAlerts ? 1 : 0.5)
                 SettingsDivider()
-                SettingRow(title: "Test", detail: Notifier.available ? "Sends one notification now." : "Available when NotchHUD runs as an app bundle.") {
-                    Button("Send a test") { Notifier.deliverTest() }.disabled(!Notifier.available)
+                SettingRow(title: "Permission", detail: notifications.text) {
+                    HStack(spacing: 8) {
+                        Circle().fill(notifications.ok ? SettingsStyle.ok : (notifications.known ? SettingsStyle.bad : SettingsStyle.secondary))
+                            .frame(width: 8, height: 8)
+                        if notifications.known, !notifications.ok, notifications.authorization == .denied {
+                            Button("Open System Settings") { Notifier.openSystemSettings() }
+                        }
+                        Button("Send a test") { Notifier.deliverTest() }.disabled(!Notifier.available)
+                    }
                 }
             }
+            .onAppear { notifications.refresh() }
 
             SettingsSection(title: "Usage only",
                             footnote: "Sessions keep being tracked in the background, so switching back is instant.") {
