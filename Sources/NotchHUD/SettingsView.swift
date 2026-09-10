@@ -270,6 +270,17 @@ struct GeneralPane: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().frame(width: 180)
                 }
+                SettingsDivider()
+                SettingRow(title: "Meter", detail: "Bars give each window its own line. Rings nest the week inside the 5-hour window with the tightest number in the middle.") {
+                    Picker("", selection: Binding(
+                        get: { prefs.usageMeter },
+                        set: { new in configStore.updatePreferences { $0.usageMeter = new } }
+                    )) {
+                        Text("Bars").tag(UsageMeterStyle.bars)
+                        Text("Rings").tag(UsageMeterStyle.rings)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 180)
+                }
             }
 
             SettingsSection(title: "Usage only",

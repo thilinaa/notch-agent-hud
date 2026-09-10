@@ -866,8 +866,12 @@ struct HUDView: View {
                             Circle().fill(sub.lane.accent.color).frame(width: 6, height: 6)
                             Text(sub.lane.label).font(.system(size: 10)).foregroundStyle(HUDStyle.secondary).lineLimit(1)
                         }.help(sub.lane.label)
-                        usageWindow(sub.fiveHour, name: "5h", accent: sub.lane.accent.color)
-                        usageWindow(sub.weekly, name: "Week", accent: sub.lane.accent.color)
+                        if prefs.usageMeter == .rings {
+                            usageRings(sub)
+                        } else {
+                            usageWindow(sub.fiveHour, name: "5h", accent: sub.lane.accent.color)
+                            usageWindow(sub.weekly, name: "Week", accent: sub.lane.accent.color)
+                        }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -920,6 +924,72 @@ struct HUDView: View {
         .padding(.top, 3)
         .help(w.map { "\(name) resets \($0.resetsAt.formatted(date: .abbreviated, time: .shortened))" } ?? "No current \(name) usage reported")
         .accessibilityElement(children: .combine)
+    }
+
+    /// Two concentric rings: the 5-hour window outside, the week inside, the
+    /// tightest window's percent in the middle. Reset times sit beside it so
+    /// a glance at the ring answers "how much", the legend "until when".
+    private func usageRings(_ sub: SubscriptionUsage) -> some View {
+        let fiveHour = sub.fiveHour.flatMap { $0.resetsAt > Date() ? $0 : nil }
+        let weekly = sub.weekly.flatMap { $0.resetsAt > Date() ? $0 : nil }
+        let accent = sub.lane.accent.color
+        let tightest = [fiveHour, weekly].compactMap { $0 }.max { ($0.percent ?? -1) < ($1.percent ?? -1) }
+        let centerText: String = {
+            guard let t = tightest else { return "—" }
+            if t.limitHit { return "Limit" }
+            guard let percent = t.percent else { return "≈\(t.tokensText)" }
+            return usageValueMode == .remaining ? "\(t.remainingPercent ?? 0)%" : String(format: "%.0f%%", percent)
+        }()
+        return HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                ring(fiveHour, accent: accent, diameter: 54, lineWidth: 5)
+                ring(weekly, accent: accent.opacity(0.55), diameter: 38, lineWidth: 5)
+                Text(centerText)
+                    .font(.system(size: centerText.count > 3 ? 7 : 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(tightest?.limitHit == true ? Palette.mismatch : HUDStyle.text)
+                    .lineLimit(1).minimumScaleFactor(0.7).frame(width: 26)
+            }
+            .frame(width: 54, height: 54)
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                ringLegend(fiveHour, name: "5h", swatch: accent)
+                ringLegend(weekly, name: "Week", swatch: accent.opacity(0.55))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(sub.lane.label): 5 hour \(fiveHour.map { $0.valueText(usageValueMode) } ?? "no data"), week \(weekly.map { $0.valueText(usageValueMode) } ?? "no data")")
+    }
+
+    private func ring(_ w: WindowUsage?, accent: Color, diameter: CGFloat, lineWidth: CGFloat) -> some View {
+        let tint = w?.limitHit == true ? Palette.mismatch : (w?.percent ?? 0) > 60 ? HUDStyle.amber : accent
+        return ZStack {
+            Circle().stroke(HUDStyle.line, lineWidth: lineWidth)
+            if let fraction = meterFraction(w) {
+                Circle().trim(from: 0, to: fraction)
+                    .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+        }
+        .frame(width: diameter, height: diameter)
+    }
+
+    private func ringLegend(_ w: WindowUsage?, name: String, swatch: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 5) {
+                Circle().strokeBorder(swatch, lineWidth: 2).frame(width: 8, height: 8)
+                Text(name).font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
+                Text(w.map { $0.valueText(usageValueMode) } ?? "—")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(w?.limitHit == true ? Palette.mismatch : HUDStyle.text)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            Text(w.map { resetText($0.resetsAt) } ?? "No current data")
+                .font(.system(size: 9)).foregroundStyle(HUDStyle.secondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .help(w.map { "\(name) resets \($0.resetsAt.formatted(date: .abbreviated, time: .shortened))" } ?? "No current \(name) usage reported")
     }
 
     /// How much of the meter is filled: spent quota in Used mode, what is

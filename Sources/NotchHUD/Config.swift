@@ -129,6 +129,14 @@ enum UsageValueMode: String, Codable, CaseIterable {
     case remaining
 }
 
+/// The shape of the quota meter in the usage card.
+enum UsageMeterStyle: String, Codable, CaseIterable {
+    /// A thin bar per window.
+    case bars
+    /// Two concentric rings per subscription: 5-hour outside, weekly inside.
+    case rings
+}
+
 /// Pure UI preferences; every field has a default so a hand-edited file may
 /// omit any of them.
 struct HUDPreferences: Codable, Equatable {
@@ -149,12 +157,14 @@ struct HUDPreferences: Codable, Equatable {
     var openOnHover = false
     /// Show quota as spent ("34%") or as what is left ("66% left").
     var usageValue: UsageValueMode = .used
+    /// Bars or rings in the usage card.
+    var usageMeter: UsageMeterStyle = .bars
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
-        case usageValue
+        case usageValue, usageMeter
     }
 
     init(from decoder: Decoder) throws {
@@ -168,6 +178,7 @@ struct HUDPreferences: Codable, Equatable {
         useUsageAPI = try c.decodeIfPresent(Bool.self, forKey: .useUsageAPI) ?? true
         openOnHover = try c.decodeIfPresent(Bool.self, forKey: .openOnHover) ?? false
         usageValue = try c.decodeIfPresent(UsageValueMode.self, forKey: .usageValue) ?? .used
+        usageMeter = try c.decodeIfPresent(UsageMeterStyle.self, forKey: .usageMeter) ?? .bars
     }
 }
 
