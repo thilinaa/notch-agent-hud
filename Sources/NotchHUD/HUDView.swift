@@ -26,6 +26,16 @@ private enum Palette {
     static let done = Color(light: 0x38755A, dark: 0x8BC5A8)
     static let mismatch = Color(light: 0xB33A2D, dark: 0xFF8A7A)
     static let okGreen = Color(light: 0x38755A, dark: 0x8BC5A8)
+    /// Claude's terracotta: the one meter color, whatever the lane.
+    static let meter = Color(light: 0xC1553B, dark: 0xD97757)
+
+    /// Quota meters share one color and turn red from 80% spent; the lane
+    /// color stays on the identity dot only, so a hot bar reads the same way
+    /// in every column.
+    static let hotPercent: Double = 80
+    static func meterTint(percent: Double?, limitHit: Bool) -> Color {
+        limitHit || (percent ?? 0) >= hotPercent ? mismatch : meter
+    }
 }
 
 /// The panel outline: rounded bottom corners, and at the top either rounded
@@ -332,7 +342,7 @@ struct HUDView: View {
             let value = tightest.limitHit ? "limit" : tightest.tightestValueText(usageValueMode)
             return PillUsage(id: sub.id, label: sub.lane.label,
                              accent: hasNotch ? sub.lane.accent.onBlack : sub.lane.accent.color,
-                             value: value, hot: tightest.limitHit || (tightest.tightestPercent ?? 0) > 60,
+                             value: value, hot: tightest.limitHit || (tightest.tightestPercent ?? 0) >= Palette.hotPercent,
                              percent: tightest.limitHit ? 100 : (tightest.tightestPercent ?? -1))
         }
     }
@@ -451,7 +461,7 @@ struct HUDView: View {
                             HStack(spacing: 4) {
                                 Circle().fill(item.accent).frame(width: 6, height: 6)
                                 Text(item.value).monospacedDigit().lineLimit(1)
-                                    .foregroundStyle(item.hot ? (hasNotch ? Color(hex: 0xE6B775) : HUDStyle.amber)
+                                    .foregroundStyle(item.hot ? (hasNotch ? Color(hex: 0xFF8A7A) : Palette.mismatch)
                                                      : (hasNotch ? Color(hex: 0xEEEEF0) : HUDStyle.text))
                             }
                             .help(item.label)
@@ -478,7 +488,7 @@ struct HUDView: View {
                     } else if let quota = tightestPill {
                         Circle().fill(quota.accent).frame(width: 6, height: 6)
                         Text(quota.value).monospacedDigit()
-                            .foregroundStyle(quota.hot ? (hasNotch ? Color(hex: 0xE6B775) : HUDStyle.amber)
+                            .foregroundStyle(quota.hot ? (hasNotch ? Color(hex: 0xFF8A7A) : Palette.mismatch)
                                              : (hasNotch ? Color(hex: 0xEEEEF0) : HUDStyle.text))
                     } else {
                         Text(usageOnly ? "Usage" : "All clear")
@@ -1024,8 +1034,7 @@ struct HUDView: View {
     private func usageWindow(_ window: WindowUsage?, name: String, accent: Color) -> some View {
         // Expired windows disappear immediately even between tracker refreshes.
         let w = window.flatMap { $0.resetsAt > Date() ? $0 : nil }
-        // Lane color while fine; amber and red are state, not identity.
-        let tint = w?.limitHit == true ? Palette.mismatch : (w?.percent ?? 0) > 60 ? HUDStyle.amber : accent
+        let tint = Palette.meterTint(percent: w?.percent, limitHit: w?.limitHit == true)
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
@@ -1036,18 +1045,15 @@ struct HUDView: View {
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(HUDStyle.line)
-                    if let fraction = meterFraction(w) {
-                        Capsule().fill(tint).frame(width: geo.size.width * fraction)
-                    }
+                    segmentedMeter(fraction: meterFraction(w), tint: tint, width: geo.size.width)
                     // Where the fill "should" be if quota and time ran together.
                     if let tick = tickFraction(w) {
                         RoundedRectangle(cornerRadius: 1).fill(HUDStyle.secondary)
-                            .frame(width: 2, height: 8)
+                            .frame(width: 2, height: 10)
                             .offset(x: geo.size.width * tick - 1)
                     }
                 }
-            }.frame(height: 4)
+            }.frame(height: 6)
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.9)
@@ -1059,6 +1065,23 @@ struct HUDView: View {
         .padding(.top, 3)
         .help(w.map { windowHelp($0, name: name) } ?? "No current \(name) usage reported")
         .accessibilityElement(children: .combine)
+    }
+
+    /// Twenty blocks; the filled ones solid in the meter color, the rest faint.
+    /// Reads as a gauge at a glance and needs no pixel-precise comparison.
+    private func segmentedMeter(fraction: CGFloat?, tint: Color, width: CGFloat) -> some View {
+        let count = 20
+        let gap: CGFloat = 2
+        let segment = max(1, (width - gap * CGFloat(count - 1)) / CGFloat(count))
+        let filled = fraction.map { Int(($0 * CGFloat(count)).rounded()) } ?? 0
+        return HStack(spacing: gap) {
+            ForEach(0..<count, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(index < filled ? tint : HUDStyle.line)
+                    .frame(width: segment, height: 6)
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     /// Tick position in the meter's own direction: elapsed time in Used mode,
@@ -1146,9 +1169,9 @@ struct HUDView: View {
         return HStack(alignment: .center, spacing: 10) {
             ZStack {
                 if hasFiveHour { ring(fiveHour, accent: accent, diameter: fiveHourDiameter, lineWidth: lineWidth) }
-                ring(weekly, accent: hasFiveHour ? accent.opacity(0.55) : accent, diameter: weeklyDiameter, lineWidth: lineWidth)
+                ring(weekly, accent: accent, diameter: weeklyDiameter, lineWidth: lineWidth)
                 if let split {
-                    ring(split.window, accent: accent.opacity(0.35), diameter: splitDiameter, lineWidth: lineWidth)
+                    ring(split.window, accent: accent, diameter: splitDiameter, lineWidth: lineWidth)
                 }
                 Text(centerText)
                     .font(.system(size: centerText.count > 3 ? 7 : 9, weight: .semibold, design: .monospaced))
@@ -1158,10 +1181,10 @@ struct HUDView: View {
             .frame(width: 56, height: 56)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                if hasFiveHour { ringLegend(fiveHour, name: "5h", swatch: accent) }
-                ringLegend(weekly, name: "Week", swatch: hasFiveHour ? accent.opacity(0.55) : accent)
+                if hasFiveHour { ringLegend(fiveHour, name: "5h", swatch: Palette.meterTint(percent: fiveHour?.tightestPercent, limitHit: fiveHour?.limitHit == true)) }
+                ringLegend(weekly, name: "Week", swatch: Palette.meterTint(percent: weekly?.tightestPercent, limitHit: weekly?.limitHit == true))
                 if let split {
-                    ringLegend(split.window, name: split.label, swatch: accent.opacity(0.35))
+                    ringLegend(split.window, name: split.label, swatch: Palette.meterTint(percent: split.window.percent, limitHit: split.window.limitHit))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1172,7 +1195,7 @@ struct HUDView: View {
     }
 
     private func ring(_ w: WindowUsage?, accent: Color, diameter: CGFloat, lineWidth: CGFloat) -> some View {
-        let tint = w?.limitHit == true ? Palette.mismatch : (w?.tightestPercent ?? 0) > 60 ? HUDStyle.amber : accent
+        let tint = Palette.meterTint(percent: w?.tightestPercent, limitHit: w?.limitHit == true)
         return ZStack {
             Circle().stroke(HUDStyle.line, lineWidth: lineWidth)
             if let fraction = meterFraction(w) {
