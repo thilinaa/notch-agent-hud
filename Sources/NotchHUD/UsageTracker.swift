@@ -119,6 +119,12 @@ struct SubscriptionUsage: Identifiable {
 @MainActor
 final class UsageTracker: ObservableObject {
     @Published private(set) var subs: [SubscriptionUsage] = []
+    /// When the exact (API) numbers last arrived, and the last scan pass.
+    @Published private(set) var lastAPISuccess: Date?
+    @Published private(set) var lastAPIFailure: Date?
+    @Published private(set) var lastScan: Date?
+    /// A user-requested refresh is in flight.
+    @Published private(set) var refreshing = false
 
     private weak var store: SessionStore?
     private var config: HUDConfig { store?.config ?? HUDConfig() }
@@ -162,6 +168,17 @@ final class UsageTracker: ObservableObject {
             self?.scan()
             self?.fetchClaudeAPIUsage()
         }
+    }
+
+    /// Scan now and fetch exact usage now, ignoring the retry back-off. The
+    /// card's refresh button; `refreshing` clears when the fetch has answered.
+    func refresh() {
+        refreshing = true
+        lastAPIFetch = .distantPast
+        apiRetryInterval = 120
+        scan()
+        fetchClaudeAPIUsage()
+        if !config.preferences.useUsageAPI { refreshing = false }
     }
 
     /// Ceilings were keyed by v1 labels ("WORK"); move them to subscription ids
@@ -311,9 +328,12 @@ final class UsageTracker: ObservableObject {
                     // The active login moved? Keep only the current lane's data.
                     self.apiByLane = [lane: windows]
                     self.apiRetryInterval = 120
+                    self.lastAPISuccess = Date()
                 } else {
                     self.apiRetryInterval = min(self.apiRetryInterval * 2, 3600)
+                    self.lastAPIFailure = Date()
                 }
+                self.refreshing = false
                 self.recompute()
             }
         }
@@ -385,6 +405,7 @@ final class UsageTracker: ObservableObject {
                         codex: [CodexWindow]) {
         cursors = updated
         codexWindows = codex
+        lastScan = Date()
         for (ts, tokens, msgid, lane) in newEvents where !seenMessageIds.contains(msgid) {
             seenMessageIds.insert(msgid)
             events.append((ts, tokens, lane))

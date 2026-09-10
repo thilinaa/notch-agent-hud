@@ -867,11 +867,32 @@ struct HUDView: View {
 
     private var usageBar: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("Usage").font(.system(size: 12, weight: .medium))
                 Spacer()
-                Text(usageValueMode == .remaining ? "Left · 5 hour / Weekly" : "5 hour / Weekly")
-                    .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
+                let freshness = usageFreshness
+                Text(freshness.text).font(.system(size: 10))
+                    .foregroundStyle(freshness.stale ? HUDStyle.amber : HUDStyle.secondary)
+                    .lineLimit(1)
+                    .help(freshness.help)
+                Button { usage.refresh() } label: {
+                    Group {
+                        if usage.refreshing {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "arrow.clockwise").font(.system(size: 10, weight: .medium))
+                        }
+                    }
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(hoveredRow == "usage-refresh" ? HUDStyle.text : HUDStyle.secondary)
+                    .background(hoveredRow == "usage-refresh" ? HUDStyle.raised : .clear, in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(usage.refreshing)
+                .onHover { hoveredRow = $0 ? "usage-refresh" : (hoveredRow == "usage-refresh" ? nil : hoveredRow) }
+                .help("Refresh usage now")
+                .accessibilityLabel("Refresh usage")
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: min(3, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
                 ForEach(usage.subs) { sub in
@@ -983,6 +1004,32 @@ struct HUDView: View {
         case .unknown: break
         }
         return text
+    }
+
+    /// When the numbers last arrived. Exact numbers come from the API, so that
+    /// is the time that counts while it is on; estimates date from the scan.
+    private var usageFreshness: (text: String, stale: Bool, help: String) {
+        func ago(_ d: Date) -> String {
+            let s = Date().timeIntervalSince(d)
+            if s < 60 { return "just now" }
+            if s < 3600 { return "\(Int(s / 60))m ago" }
+            return "\(Int(s / 3600))h ago"
+        }
+        guard prefs.useUsageAPI else {
+            return ("Estimates" + (usage.lastScan.map { " · \(ago($0))" } ?? ""), false,
+                    "Exact usage from Anthropic's API is off in Settings → Advanced; these are transcript estimates.")
+        }
+        guard let ok = usage.lastAPISuccess else {
+            if usage.lastAPIFailure != nil {
+                return ("Exact usage unavailable", true,
+                        "The usage endpoint could not be reached, or Keychain access was denied. Estimates are shown; retrying with back-off.")
+            }
+            return ("Fetching…", false, "Contacting Anthropic's usage endpoint.")
+        }
+        let failedSince = (usage.lastAPIFailure ?? .distantPast) > ok
+        let stale = failedSince && Date().timeIntervalSince(ok) > 5 * 60
+        return ("Updated \(ago(ok))" + (stale ? " · retrying" : ""), stale,
+                "Exact numbers last fetched \(ok.formatted(date: .omitted, time: .shortened))." + (failedSince ? " The latest attempt failed; retrying with back-off." : ""))
     }
 
     /// Two concentric rings: the 5-hour window outside, the week inside, the
