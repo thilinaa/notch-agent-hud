@@ -858,7 +858,7 @@ struct HUDView: View {
                 Text(usageValueMode == .remaining ? "Left · 5 hour / Weekly" : "5 hour / Weekly")
                     .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: min(3, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: min(3, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
                 ForEach(usage.subs) { sub in
                     VStack(alignment: .leading, spacing: 7) {
                         Text(sub.lane.provider == .codex ? "Codex" : "Claude").font(.system(size: 12, weight: .medium))
@@ -915,15 +915,49 @@ struct HUDView: View {
                     if let fraction = meterFraction(w) {
                         Capsule().fill(tint).frame(width: geo.size.width * fraction)
                     }
+                    // Where the fill "should" be if quota and time ran together.
+                    if let tick = tickFraction(w) {
+                        RoundedRectangle(cornerRadius: 1).fill(HUDStyle.secondary)
+                            .frame(width: 2, height: 8)
+                            .offset(x: geo.size.width * tick - 1)
+                    }
                 }
             }.frame(height: 4)
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.9)
+            if let pace = w.flatMap(paceText) {
+                Text(pace).font(.system(size: 10)).foregroundStyle(HUDStyle.amber)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
         }
         .padding(.top, 3)
-        .help(w.map { "\(name) resets \($0.resetsAt.formatted(date: .abbreviated, time: .shortened))" } ?? "No current \(name) usage reported")
+        .help(w.map { windowHelp($0, name: name) } ?? "No current \(name) usage reported")
         .accessibilityElement(children: .combine)
+    }
+
+    /// Tick position in the meter's own direction: elapsed time in Used mode,
+    /// time left in Remaining mode, so fill and tick always compare directly.
+    private func tickFraction(_ w: WindowUsage?) -> CGFloat? {
+        guard let w, w.percent != nil else { return nil }
+        let elapsed = w.elapsedFraction()
+        return CGFloat(usageValueMode == .remaining ? 1 - elapsed : elapsed)
+    }
+
+    /// One amber line, only when quota is going faster than the window.
+    private func paceText(_ w: WindowUsage) -> String? {
+        guard case .ahead(let limitAt) = w.pace() else { return nil }
+        return "At this pace, limit in \(durationText(until: limitAt))"
+    }
+
+    private func windowHelp(_ w: WindowUsage, name: String) -> String {
+        var text = "\(name) resets \(w.resetsAt.formatted(date: .abbreviated, time: .shortened)) · \(Int((w.elapsedFraction() * 100).rounded()))% of the window has passed."
+        switch w.pace() {
+        case .onPace(let spare): text += " On pace: about \(Int((max(0, spare) * 100).rounded()))% would be left at the reset."
+        case .ahead(let limitAt): text += " Faster than the window: the limit lands around \(limitAt.formatted(date: .omitted, time: .shortened))."
+        case .unknown: break
+        }
+        return text
     }
 
     /// Two concentric rings: the 5-hour window outside, the week inside, the
@@ -971,6 +1005,11 @@ struct HUDView: View {
                     .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
+            if let tick = tickFraction(w) {
+                Circle().fill(HUDStyle.secondary).frame(width: 3, height: 3)
+                    .offset(y: -diameter / 2)
+                    .rotationEffect(.degrees(Double(tick) * 360))
+            }
         }
         .frame(width: diameter, height: diameter)
     }
@@ -988,8 +1027,12 @@ struct HUDView: View {
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 9)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.8)
+            if let pace = w.flatMap(paceText) {
+                Text(pace).font(.system(size: 9)).foregroundStyle(HUDStyle.amber)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
         }
-        .help(w.map { "\(name) resets \($0.resetsAt.formatted(date: .abbreviated, time: .shortened))" } ?? "No current \(name) usage reported")
+        .help(w.map { windowHelp($0, name: name) } ?? "No current \(name) usage reported")
     }
 
     /// How much of the meter is filled: spent quota in Used mode, what is
@@ -1007,9 +1050,15 @@ struct HUDView: View {
 
     private func resetText(_ date: Date) -> String {
         let minutes = max(1, Int(ceil(date.timeIntervalSinceNow / 60)))
-        if minutes < 60 { return "Resets in \(minutes)m" }
-        if minutes < 1440 { return "Resets in \(minutes / 60)h \(minutes % 60)m" }
+        if minutes < 1440 { return "Resets in \(durationText(until: date))" }
         return "Resets " + date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    }
+
+    private func durationText(until date: Date) -> String {
+        let minutes = max(1, Int(ceil(date.timeIntervalSinceNow / 60)))
+        if minutes < 60 { return "\(minutes)m" }
+        if minutes < 1440 { return "\(minutes / 60)h \(minutes % 60)m" }
+        return "\(minutes / 1440)d \(minutes % 1440 / 60)h"
     }
 
     private var guardBar: some View {

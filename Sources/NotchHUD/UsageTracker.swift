@@ -9,8 +9,47 @@ struct WindowUsage {
     var percent: Double? = nil
     /// Estimated tokens burned (Claude); shown when no percent is available.
     var tokens: Int? = nil
+    /// Window length: five hours, or a week for the weekly window.
+    var length: TimeInterval = WindowUsage.fiveHours
+
+    static let fiveHours: TimeInterval = 5 * 3600
+    static let oneWeek: TimeInterval = 7 * 86400
 
     var fraction: Double? { percent.map { min(1.0, $0 / 100) } }
+
+    /// How far through the window we are, 0 at its start and 1 at the reset.
+    func elapsedFraction(at now: Date = Date()) -> Double {
+        guard length > 0 else { return 0 }
+        return max(0, min(1, 1 - resetsAt.timeIntervalSince(now) / length))
+    }
+
+    /// Spending compared with the passage of time. "Ahead" means the quota is
+    /// going faster than the window, and names the moment it runs out at the
+    /// current rate. Silent for the first tenth of a window, when two messages
+    /// at 07:01 would otherwise project a limit by lunch.
+    enum Pace: Equatable {
+        case unknown
+        /// Quota outlasts the window; `spare` is the fraction still unspent at the reset.
+        case onPace(spare: Double)
+        case ahead(limitAt: Date)
+    }
+
+    func pace(at now: Date = Date()) -> Pace {
+        guard let used = fraction, !limitHit else { return .unknown }
+        let elapsed = elapsedFraction(at: now)
+        guard elapsed >= 0.1, used > 0 else { return .unknown }
+        let projected = used / elapsed
+        // Time already spent, scaled by what is left to burn versus what went.
+        let elapsedTime = length * elapsed
+        let untilLimit = elapsedTime * (1 - used) / used
+        let limitAt = now.addingTimeInterval(untilLimit)
+        // A limit landing within the last twentieth of the window is a wash,
+        // not a warning; the caption should not flap around the line.
+        if projected <= 1 || resetsAt.timeIntervalSince(limitAt) < length * 0.05 {
+            return .onPace(spare: 1 - projected)
+        }
+        return .ahead(limitAt: limitAt)
+    }
     /// Whole-number percent left, floored so "1% left" never rounds up to "0% left" while usable.
     var remainingPercent: Int? { percent.map { max(0, Int((100 - $0).rounded(.down))) } }
 
@@ -377,7 +416,7 @@ final class UsageTracker: ObservableObject {
             // Claude's weekly window is only visible when a seven_day 429 was seen.
             var weekly: WindowUsage?
             if let resets = weeklyLimits[lane], resets > Date() {
-                weekly = WindowUsage(resetsAt: resets, limitHit: true)
+                weekly = WindowUsage(resetsAt: resets, limitHit: true, length: WindowUsage.oneWeek)
             }
             // Authoritative API data for this lane overrides estimates.
             if let api = apiByLane[lane] {
@@ -387,7 +426,7 @@ final class UsageTracker: ObservableObject {
                 }
                 if let wk = api.weekly, wk.resetsAt > Date() {
                     weekly = WindowUsage(resetsAt: wk.resetsAt, limitHit: wk.percent >= 100,
-                                         percent: wk.percent)
+                                         percent: wk.percent, length: WindowUsage.oneWeek)
                 }
             }
             result.append(SubscriptionUsage(lane: config.lane(id: lane), fiveHour: fiveHour, weekly: weekly))
@@ -397,7 +436,8 @@ final class UsageTracker: ObservableObject {
             let fh = api.fiveHour.flatMap { $0.resetsAt > Date()
                 ? WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent) : nil }
             let wk = api.weekly.flatMap { $0.resetsAt > Date()
-                ? WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent) : nil }
+                ? WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent,
+                              length: WindowUsage.oneWeek) : nil }
             if fh != nil || wk != nil {
                 result.append(SubscriptionUsage(lane: config.lane(id: lane), fiveHour: fh, weekly: wk))
             }
@@ -410,7 +450,8 @@ final class UsageTracker: ObservableObject {
         if !codexWindows.isEmpty {
             func window(_ label: String) -> WindowUsage? {
                 codexWindows.first { $0.label == label }.map {
-                    WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent)
+                    WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent,
+                                length: label == "1w" ? WindowUsage.oneWeek : WindowUsage.fiveHours)
                 }
             }
             result.append(SubscriptionUsage(lane: config.codexLane, fiveHour: window("5h"), weekly: window("1w")))
