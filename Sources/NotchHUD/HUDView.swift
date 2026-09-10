@@ -281,11 +281,11 @@ struct HUDView: View {
     private var pillUsage: [PillUsage] {
         usage.subs.prefix(3).compactMap { sub in
             let windows = [sub.fiveHour, sub.weekly].compactMap { $0 }.filter { $0.resetsAt > Date() }
-            guard let tightest = windows.max(by: { ($0.percent ?? -1) < ($1.percent ?? -1) }) else { return nil }
-            let value = tightest.limitHit ? "limit" : tightest.valueText(usageValueMode)
+            guard let tightest = windows.max(by: { ($0.tightestPercent ?? -1) < ($1.tightestPercent ?? -1) }) else { return nil }
+            let value = tightest.limitHit ? "limit" : tightest.tightestValueText(usageValueMode)
             return PillUsage(id: sub.id, label: sub.lane.label,
                              accent: hasNotch ? sub.lane.accent.onBlack : sub.lane.accent.color,
-                             value: value, hot: tightest.limitHit || (tightest.percent ?? 0) > 60)
+                             value: value, hot: tightest.limitHit || (tightest.tightestPercent ?? 0) > 60)
         }
     }
 
@@ -926,6 +926,7 @@ struct HUDView: View {
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.9)
+            if let w, !w.splits.isEmpty { splitText(w, size: 10) }
             if let pace = w.flatMap(paceText) {
                 Text(pace).font(.system(size: 10)).foregroundStyle(HUDStyle.amber)
                     .lineLimit(1).minimumScaleFactor(0.8)
@@ -934,6 +935,15 @@ struct HUDView: View {
         .padding(.top, 3)
         .help(w.map { windowHelp($0, name: name) } ?? "No current \(name) usage reported")
         .accessibilityElement(children: .combine)
+    }
+
+    /// Per-model caps under the week ("Fable 37%"), amber once one runs hot.
+    private func splitText(_ w: WindowUsage, size: CGFloat) -> some View {
+        let hot = w.splits.contains { $0.percent > 60 }
+        return Text(w.splits.map { $0.valueText(usageValueMode) }.joined(separator: " · "))
+            .font(.system(size: size)).foregroundStyle(hot ? HUDStyle.amber : HUDStyle.secondary)
+            .lineLimit(1).minimumScaleFactor(0.8)
+            .help("Per-model weekly caps. The tightest one binds before the overall week does.")
     }
 
     /// Tick position in the meter's own direction: elapsed time in Used mode,
@@ -967,12 +977,12 @@ struct HUDView: View {
         let fiveHour = sub.fiveHour.flatMap { $0.resetsAt > Date() ? $0 : nil }
         let weekly = sub.weekly.flatMap { $0.resetsAt > Date() ? $0 : nil }
         let accent = sub.lane.accent.color
-        let tightest = [fiveHour, weekly].compactMap { $0 }.max { ($0.percent ?? -1) < ($1.percent ?? -1) }
+        let tightest = [fiveHour, weekly].compactMap { $0 }.max { ($0.tightestPercent ?? -1) < ($1.tightestPercent ?? -1) }
         let centerText: String = {
             guard let t = tightest else { return "—" }
             if t.limitHit { return "Limit" }
-            guard let percent = t.percent else { return "≈\(t.tokensText)" }
-            return usageValueMode == .remaining ? "\(t.remainingPercent ?? 0)%" : String(format: "%.0f%%", percent)
+            guard let percent = t.tightestPercent else { return "≈\(t.tokensText)" }
+            return usageValueMode == .remaining ? "\(max(0, Int((100 - percent).rounded(.down))))%" : String(format: "%.0f%%", percent)
         }()
         return HStack(alignment: .center, spacing: 10) {
             ZStack {
@@ -997,7 +1007,7 @@ struct HUDView: View {
     }
 
     private func ring(_ w: WindowUsage?, accent: Color, diameter: CGFloat, lineWidth: CGFloat) -> some View {
-        let tint = w?.limitHit == true ? Palette.mismatch : (w?.percent ?? 0) > 60 ? HUDStyle.amber : accent
+        let tint = w?.limitHit == true ? Palette.mismatch : (w?.tightestPercent ?? 0) > 60 ? HUDStyle.amber : accent
         return ZStack {
             Circle().stroke(HUDStyle.line, lineWidth: lineWidth)
             if let fraction = meterFraction(w) {
@@ -1027,6 +1037,7 @@ struct HUDView: View {
             Text(w.map { resetText($0.resetsAt) } ?? "No current data")
                 .font(.system(size: 9)).foregroundStyle(HUDStyle.secondary)
                 .lineLimit(1).minimumScaleFactor(0.8)
+            if let w, !w.splits.isEmpty { splitText(w, size: 9) }
             if let pace = w.flatMap(paceText) {
                 Text(pace).font(.system(size: 9)).foregroundStyle(HUDStyle.amber)
                     .lineLimit(1).minimumScaleFactor(0.8)

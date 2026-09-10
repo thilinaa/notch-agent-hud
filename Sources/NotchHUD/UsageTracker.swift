@@ -11,6 +11,16 @@ struct WindowUsage {
     var tokens: Int? = nil
     /// Window length: five hours, or a week for the weekly window.
     var length: TimeInterval = WindowUsage.fiveHours
+    /// Per-model caps inside this window ("Fable 37%"), tightest first. A
+    /// scoped cap can bind before the overall one, so the tightest reading
+    /// of a window takes them into account.
+    var splits: [WindowSplit] = []
+
+    /// The percent that actually governs: the overall figure or a tighter split.
+    var tightestPercent: Double? {
+        let candidates = [percent].compactMap { $0 } + splits.map { $0.percent }
+        return candidates.max()
+    }
 
     static let fiveHours: TimeInterval = 5 * 3600
     static let oneWeek: TimeInterval = 7 * 86400
@@ -66,11 +76,31 @@ struct WindowUsage {
         return "≈\(tokensText)"
     }
 
+    /// Like `valueText`, but for the governing figure (a tight per-model cap wins).
+    func tightestValueText(_ mode: UsageValueMode) -> String {
+        guard let tightestPercent, tightestPercent != percent else { return valueText(mode) }
+        var copy = self
+        copy.percent = tightestPercent
+        return copy.valueText(mode)
+    }
+
     var tokensText: String {
         let t = tokens ?? 0
         if t >= 1_000_000 { return String(format: "%.1fM", Double(t) / 1_000_000) }
         if t >= 1_000 { return String(format: "%.0fK", Double(t) / 1_000) }
         return "\(t)"
+    }
+}
+
+struct WindowSplit: Equatable {
+    let label: String
+    let percent: Double
+
+    func valueText(_ mode: UsageValueMode) -> String {
+        switch mode {
+        case .used: return "\(label) \(Int(percent.rounded()))%"
+        case .remaining: return "\(label) \(max(0, Int((100 - percent).rounded(.down))))% left"
+        }
     }
 }
 
@@ -426,7 +456,8 @@ final class UsageTracker: ObservableObject {
                 }
                 if let wk = api.weekly, wk.resetsAt > Date() {
                     weekly = WindowUsage(resetsAt: wk.resetsAt, limitHit: wk.percent >= 100,
-                                         percent: wk.percent, length: WindowUsage.oneWeek)
+                                         percent: wk.percent, length: WindowUsage.oneWeek,
+                                         splits: Self.splits(api))
                 }
             }
             result.append(SubscriptionUsage(lane: config.lane(id: lane), fiveHour: fiveHour, weekly: weekly))
@@ -437,7 +468,7 @@ final class UsageTracker: ObservableObject {
                 ? WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent) : nil }
             let wk = api.weekly.flatMap { $0.resetsAt > Date()
                 ? WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent,
-                              length: WindowUsage.oneWeek) : nil }
+                              length: WindowUsage.oneWeek, splits: Self.splits(api)) : nil }
             if fh != nil || wk != nil {
                 result.append(SubscriptionUsage(lane: config.lane(id: lane), fiveHour: fh, weekly: wk))
             }
@@ -458,6 +489,11 @@ final class UsageTracker: ObservableObject {
         }
         // Hidden subscriptions keep being tracked; they just don't get a row.
         subs = result.filter { $0.lane.visible }
+    }
+
+    /// Live scoped caps only; an expired split is no longer binding.
+    nonisolated private static func splits(_ api: ClaudeUsageAPI.Windows) -> [WindowSplit] {
+        api.weeklySplits.filter { $0.resetsAt > Date() }.map { WindowSplit(label: $0.label, percent: $0.percent) }
     }
 
     nonisolated private static func parseISO(_ s: String) -> Date? {

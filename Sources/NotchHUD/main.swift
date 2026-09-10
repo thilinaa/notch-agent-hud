@@ -108,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             "percent": w.percent ?? -1, "tokens": w.tokens ?? -1,
                             "resetsAt": ISO8601DateFormatter().string(from: w.resetsAt),
                             "limitHit": w.limitHit,
+                            "splits": w.splits.map { ["label": $0.label, "percent": $0.percent] },
                         ]
                     }
                     let usageLanes: [[String: Any]] = (usageTracker?.subs ?? []).map {
