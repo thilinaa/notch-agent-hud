@@ -28,6 +28,50 @@ private enum Palette {
     static let okGreen = Color(light: 0x38755A, dark: 0x8BC5A8)
 }
 
+/// The panel outline: rounded bottom corners, and at the top either rounded
+/// corners (a floating capsule on an ordinary display) or "ears", concave
+/// fillets that reach `earRadius` outside the frame on each side and meet the
+/// screen edge tangentially, like the physical notch does.
+struct NotchPillShape: InsettableShape {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+    var earRadius: CGFloat
+    var inset: CGFloat = 0
+
+    func inset(by amount: CGFloat) -> NotchPillShape {
+        var copy = self
+        copy.inset += amount
+        return copy
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let r = rect.insetBy(dx: inset, dy: inset)
+        let bottom = min(bottomRadius, r.width / 2, r.height / 2)
+        var p = Path()
+        if earRadius > 0 {
+            let ear = min(earRadius, r.height / 2)
+            // Quadratic curves with the corner as control point hug the corner:
+            // tangent to the top edge outside, tangent to the side inside.
+            p.move(to: CGPoint(x: r.minX - ear, y: r.minY))
+            p.addQuadCurve(to: CGPoint(x: r.minX, y: r.minY + ear), control: CGPoint(x: r.minX, y: r.minY))
+            p.addLine(to: CGPoint(x: r.minX, y: r.maxY - bottom))
+            p.addArc(center: CGPoint(x: r.minX + bottom, y: r.maxY - bottom), radius: bottom,
+                     startAngle: .degrees(180), endAngle: .degrees(90), clockwise: true)
+            p.addLine(to: CGPoint(x: r.maxX - bottom, y: r.maxY))
+            p.addArc(center: CGPoint(x: r.maxX - bottom, y: r.maxY - bottom), radius: bottom,
+                     startAngle: .degrees(90), endAngle: .degrees(0), clockwise: true)
+            p.addLine(to: CGPoint(x: r.maxX, y: r.minY + ear))
+            p.addQuadCurve(to: CGPoint(x: r.maxX + ear, y: r.minY), control: CGPoint(x: r.maxX, y: r.minY))
+            p.closeSubpath()
+            return p
+        }
+        let top = min(topRadius, r.width / 2, r.height / 2)
+        p.addPath(UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
+                                         bottomTrailingRadius: bottom, topTrailingRadius: top).path(in: r))
+        return p
+    }
+}
+
 /// App icons for the tool badge, loaded from the installed apps.
 @MainActor
 enum ToolIcons {
@@ -367,12 +411,16 @@ struct HUDView: View {
         }
     }
 
-    private var shape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: hasNotch ? 0 : 15,
-            bottomLeadingRadius: expanded ? 22 : 15,
-            bottomTrailingRadius: expanded ? 22 : 15,
-            topTrailingRadius: hasNotch ? 0 : 15
+    /// Under a notch the top corners flare outward into the screen edge with a
+    /// concave fillet, the way the physical notch meets the bezel, so the pill
+    /// reads as part of the notch rather than a rectangle hanging beneath it.
+    private var earRadius: CGFloat { hasNotch ? 10 : 0 }
+
+    private var shape: NotchPillShape {
+        NotchPillShape(
+            topRadius: hasNotch ? 0 : 15,
+            bottomRadius: expanded ? 22 : 15,
+            earRadius: earRadius
         )
     }
 
@@ -446,7 +494,10 @@ struct HUDView: View {
             .foregroundStyle(hasNotch ? Color(hex: 0xEEEEF0) : HUDStyle.text)
             .padding(.horizontal, 16)
             .frame(height: pillHeight)
-            .background(hasNotch ? Color.black : HUDStyle.background)
+            // The pill's own surface also paints the ears; the outer clip trims
+            // the bottom corners when the panel is collapsed.
+            .background(NotchPillShape(topRadius: 0, bottomRadius: 0, earRadius: earRadius)
+                .fill(hasNotch ? Color.black : HUDStyle.background))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
