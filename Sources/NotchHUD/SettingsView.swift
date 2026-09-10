@@ -281,6 +281,15 @@ struct GeneralPane: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().frame(width: 180)
                 }
+                SettingsDivider()
+                SettingRow(title: "Quota on the pill", detail: "When nothing needs you, the pill's right side shows the subscription closest to a limit instead of \u{201C}All clear\u{201D}. Usage-only mode already shows every lane there.") {
+                    Toggle("", isOn: Binding(
+                        get: { prefs.pillShowsUsage },
+                        set: { new in configStore.updatePreferences { $0.pillShowsUsage = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                    .disabled(prefs.usageOnly)
+                }
+                .opacity(prefs.usageOnly ? 0.5 : 1)
             }
 
             SettingsSection(title: "Usage only",

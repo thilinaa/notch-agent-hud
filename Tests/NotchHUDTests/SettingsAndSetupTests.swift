@@ -40,6 +40,8 @@ final class SettingsAndSetupTests: XCTestCase {
         XCTAssertEqual(HUDConfig.parseV2(["subscriptions": [], "preferences": ["usageValue": "remaining"]]).preferences.usageValue, .remaining)
         XCTAssertEqual(HUDPreferences().usageMeter, .bars)
         XCTAssertEqual(HUDConfig.parseV2(["subscriptions": [], "preferences": ["usageMeter": "rings"]]).preferences.usageMeter, .rings)
+        XCTAssertFalse(HUDPreferences().pillShowsUsage)
+        XCTAssertTrue(HUDConfig.parseV2(["subscriptions": [], "preferences": ["pillShowsUsage": true]]).preferences.pillShowsUsage)
 
         // A v2 file written before preferences existed, with named accounts: no setup nag.
         let early: [String: Any] = ["subscriptions": [[

@@ -276,6 +276,8 @@ struct HUDView: View {
         let accent: Color
         let value: String
         let hot: Bool
+        /// Governing percent, for picking the single tightest lane.
+        let percent: Double
     }
 
     private var pillUsage: [PillUsage] {
@@ -285,8 +287,15 @@ struct HUDView: View {
             let value = tightest.limitHit ? "limit" : tightest.tightestValueText(usageValueMode)
             return PillUsage(id: sub.id, label: sub.lane.label,
                              accent: hasNotch ? sub.lane.accent.onBlack : sub.lane.accent.color,
-                             value: value, hot: tightest.limitHit || (tightest.tightestPercent ?? 0) > 60)
+                             value: value, hot: tightest.limitHit || (tightest.tightestPercent ?? 0) > 60,
+                             percent: tightest.limitHit ? 100 : (tightest.tightestPercent ?? -1))
         }
+    }
+
+    /// The one lane closest to a limit, for the quiet side of the sessions pill.
+    private var tightestPill: PillUsage? {
+        guard prefs.pillShowsUsage, !usageOnly else { return nil }
+        return pillUsage.max { $0.percent < $1.percent }
     }
 
     private var usageSummary: String {
@@ -417,12 +426,18 @@ struct HUDView: View {
                         Text("gh default")
                     } else if showsAttention, !attention.isEmpty {
                         Text("\(attention.count) needs you")
+                    } else if let quota = tightestPill {
+                        Circle().fill(quota.accent).frame(width: 6, height: 6)
+                        Text(quota.value).monospacedDigit()
+                            .foregroundStyle(quota.hot ? (hasNotch ? Color(hex: 0xE6B775) : HUDStyle.amber)
+                                             : (hasNotch ? Color(hex: 0xEEEEF0) : HUDStyle.text))
                     } else {
                         Text(usageOnly ? "Usage" : "All clear")
                     }
                     Image(systemName: expanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 8, weight: .semibold))
                 }
+                .help(tightestPill.map { "\($0.label) · tightest window \($0.value)" } ?? "")
                 .foregroundStyle(store.guardStatus.level == .mismatch ? (hasNotch ? Color(hex: 0xFF8A7A) : Palette.mismatch) : (attention.isEmpty || !showsAttention) ? (hasNotch ? Color(hex: 0x969AA4) : HUDStyle.secondary) : (hasNotch ? Color(hex: 0xE6B775) : HUDStyle.amber))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -436,7 +451,7 @@ struct HUDView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(usageOnly ? "\(usageSummary). \(expanded ? "Collapse" : "Expand") usage panel"
-                            : "\(working.count) working, \(attention.count) need you. \(expanded ? "Collapse" : "Expand") agent panel")
+                            : "\(working.count) working, \(attention.count) need you.\(tightestPill.map { " \($0.label) \($0.value)." } ?? "") \(expanded ? "Collapse" : "Expand") agent panel")
     }
 
     private var activityBudget: CGFloat {

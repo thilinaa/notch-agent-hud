@@ -159,12 +159,15 @@ struct HUDPreferences: Codable, Equatable {
     var usageValue: UsageValueMode = .used
     /// Bars or rings in the usage card.
     var usageMeter: UsageMeterStyle = .bars
+    /// In the normal (sessions) mode, the pill's quiet side shows the tightest
+    /// quota window instead of "All clear".
+    var pillShowsUsage = false
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
-        case usageValue, usageMeter
+        case usageValue, usageMeter, pillShowsUsage
     }
 
     init(from decoder: Decoder) throws {
@@ -179,6 +182,7 @@ struct HUDPreferences: Codable, Equatable {
         openOnHover = try c.decodeIfPresent(Bool.self, forKey: .openOnHover) ?? false
         usageValue = try c.decodeIfPresent(UsageValueMode.self, forKey: .usageValue) ?? .used
         usageMeter = try c.decodeIfPresent(UsageMeterStyle.self, forKey: .usageMeter) ?? .bars
+        pillShowsUsage = try c.decodeIfPresent(Bool.self, forKey: .pillShowsUsage) ?? false
     }
 }
 
