@@ -34,6 +34,7 @@ final class SettingsAndSetupTests: XCTestCase {
         XCTAssertFalse(loaded.preferences.onboardingCompleted)
         XCTAssertTrue(loaded.needsOnboarding)
         XCTAssertEqual(HUDConfig.parseV2(["subscriptions": []]).preferences, HUDPreferences())
+        XCTAssertEqual(HUDPreferences().density, .minimal, "one line per session is the default")
         XCTAssertFalse(HUDPreferences().openOnHover, "click-to-open is the default")
         XCTAssertTrue(HUDConfig.parseV2(["subscriptions": [], "preferences": ["openOnHover": true]]).preferences.openOnHover)
         XCTAssertEqual(HUDPreferences().usageValue, .used, "spent quota is the default reading")

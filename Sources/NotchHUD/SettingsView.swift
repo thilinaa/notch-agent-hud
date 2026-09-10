@@ -226,7 +226,7 @@ struct GeneralPane: View {
                         blurb: "How the pill and panel look and what they show. Everything here applies immediately.")
 
             SettingsSection(title: "Layout") {
-                SettingRow(title: "Density", detail: "Compact tightens spacing and hides secondary lines. Minimal puts each session on one line so long lists fit.") {
+                SettingRow(title: "Density", detail: "Minimal, the default, puts each session on one line so long lists fit. Compact keeps two lines with tighter spacing. Cozy shows full cards.") {
                     Picker("", selection: Binding(
                         get: { prefs.density },
                         set: { new in configStore.updatePreferences { $0.density = new } }

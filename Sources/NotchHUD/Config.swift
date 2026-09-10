@@ -140,7 +140,7 @@ enum UsageMeterStyle: String, Codable, CaseIterable {
 /// Pure UI preferences; every field has a default so a hand-edited file may
 /// omit any of them.
 struct HUDPreferences: Codable, Equatable {
-    var density: HUDDensity = .cozy
+    var density: HUDDensity = .minimal
     var appearance: HUDAppearance = .system
     /// Accent for the app's own status color (working indicator, controls).
     var accent: SubscriptionAccent = .blue
@@ -178,7 +178,7 @@ struct HUDPreferences: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        density = try c.decodeIfPresent(HUDDensity.self, forKey: .density) ?? .cozy
+        density = try c.decodeIfPresent(HUDDensity.self, forKey: .density) ?? .minimal
         appearance = try c.decodeIfPresent(HUDAppearance.self, forKey: .appearance) ?? .system
         accent = try c.decodeIfPresent(SubscriptionAccent.self, forKey: .accent) ?? .blue
         usageOnly = try c.decodeIfPresent(Bool.self, forKey: .usageOnly) ?? false

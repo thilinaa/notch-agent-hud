@@ -66,7 +66,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
   <img src="docs/screenshots/settings-subscriptions.png" width="560" alt="Subscriptions settings">
 </p>
 
-- **General** — density (*Cozy*, *Compact*, or *Minimal*, one line per session so long lists fit), open on hover (off by default: the pill is click-to-open and stays open until clicked again), appearance (System, Light, Dark), and the accent that colors the working indicator.
+- **General** — density (*Minimal*, the default, one line per session so long lists fit; *Compact*; or *Cozy*, with full cards), open on hover (off by default: the pill is click-to-open and stays open until clicked again), appearance (System, Light, Dark), and the accent that colors the working indicator.
   - **Usage** — show quota as *Used* (`34%`, a meter that fills) or *Remaining* (`66% left`, a meter that drains); the meter as *Bars* or *Rings* (the week nested inside the 5-hour window, tightest number in the middle); and *Quota on the pill*, which puts the subscription closest to a limit where "All clear" would be.
   - **Alerts** — one notification when a window crosses the threshold (50/70/80/90%), one when it hits the limit, and one when a window that ran hot resets. macOS asks once to allow them; *Send a test* checks the permission.
   - **Window warm-up** — a 5-hour window starts with your first message and ends five hours later, whether that was "hi" at 07:00 or real work at 09:00. Set one or more times (weekdays only by default) and NotchHUD runs `claude -p hi` from `~/.notchhud/warmup` at that moment, using the login Claude Code is signed into. It is skipped when a window is already running, a Mac asleep at the time catches up within two hours, and the last outcome shows in Settings. Each run costs one short message.
@@ -104,7 +104,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
     { "id": "…", "kind": "owner", "value": "company", "ghAccount": "me-work", "subscriptionID": "5D2A…" }
   ],
   "preferences": {
-    "density": "cozy", "appearance": "system", "accent": "blue",
+    "density": "minimal", "appearance": "system", "accent": "blue",
     "usageOnly": false, "attentionBreaksThrough": true, "onboardingCompleted": true,
     "useUsageAPI": true, "openOnHover": false,
     "usageValue": "used", "usageMeter": "bars", "pillShowsUsage": false,
