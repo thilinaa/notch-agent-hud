@@ -62,8 +62,9 @@ final class SettingsWindowController {
             let root = SettingsView(configStore: configStore, store: store, selection: selectedTab)
             let w = NSWindow(contentViewController: NSHostingController(rootView: root))
             w.title = "NotchHUD Settings"
-            w.styleMask = [.titled, .closable, .miniaturizable]
+            w.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             w.setContentSize(NSSize(width: 600, height: 560))
+            w.contentMinSize = NSSize(width: 560, height: 480)
             w.isReleasedWhenClosed = false
             w.center()
             window = w
