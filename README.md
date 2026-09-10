@@ -7,7 +7,8 @@
 <p align="center">
   Your coding agents, at the top of the screen.<br>
   A tiny macOS HUD around the notch that shows which <b>Claude Code</b> and <b>Codex</b> sessions are working,
-  which need you, and how much of each subscription's quota is left.
+  which need you, and how much of each subscription's quota is left, with the pace you are burning it at,
+  alerts before you hit a limit, and a scheduler that starts your 5-hour window before you sit down.
 </p>
 
 <p align="center">
@@ -17,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/panel.png" width="520" alt="The expanded panel: sessions that need you, working sessions, usage per subscription, and the GitHub account guard">
+  <img src="docs/screenshots/panel.png" width="520" alt="The expanded panel: sessions that need you, working sessions, Claude and Codex usage with pace marks, and the GitHub account guard">
 </p>
 
 ## What it does
@@ -72,6 +73,10 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
 - **Subscriptions** — the logins you own. Rename each in your own words, pick a lane color, hide a lane without deleting it, remove accounts you no longer use. Logins the HUD has seen but you have not named appear under *Seen on this Mac* with a one-click *Name it*. Codex is listed once it is detected.
 - **Rules** — folder and GitHub-owner rules, each with an expected subscription and an expected `gh` account. Owner rules beat folder rules, and among folders the longest match wins. Folders come from a picker or from suggestions based on where your sessions actually run.
 - **Advanced** — hook status with a one-click installer, Accessibility status, a switch for exact usage from Anthropic's API (reads the token Claude Code keeps in the Keychain; off means estimates only and no Keychain access), the default terminal, the Codex app bundle id, and the relay port.
+
+<p align="center">
+  <img src="docs/screenshots/warmup.png" width="720" alt="The window warm-up schedule in Settings next to the panel with Claude and Codex usage">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/panel-minimal.png" width="520" alt="Minimal density: one line per session">
