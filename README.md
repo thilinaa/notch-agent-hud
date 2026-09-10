@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/panel.png" width="520" alt="The expanded panel: sessions that need you, working sessions, Claude and Codex usage with pace marks, and the GitHub account guard">
+  <img src="docs/screenshots/panel.png" width="520" alt="The expanded panel: Claude Code and Codex sessions that need you, working sessions, both subscriptions' usage with pace marks, and the GitHub account guard">
 </p>
 
 ## What it does
@@ -81,7 +81,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/panel-minimal.png" width="520" alt="Minimal density: one line per session">
+  <img src="docs/screenshots/panel-cozy.png" width="520" alt="Cozy density: sessions that need you as full cards with the request text and an open button">
 </p>
 
 ## Config file
