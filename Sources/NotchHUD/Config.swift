@@ -193,6 +193,32 @@ struct HUDPreferences: Codable, Equatable {
     }
 }
 
+// MARK: - Warm-up schedule
+
+/// When to say hi to Claude so a 5-hour window is already running when the
+/// day starts. Times are "HH:mm" in the Mac's local time.
+struct WarmupSchedule: Codable, Equatable {
+    var enabled = false
+    var times: [String] = ["07:00"]
+    var weekdaysOnly = true
+    /// How late a slot may still run, for a Mac that was asleep at the time.
+    var graceMinutes = 120
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey { case enabled, times, weekdaysOnly, graceMinutes }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        let raw = try c.decodeIfPresent([String].self, forKey: .times) ?? ["07:00"]
+        times = raw.filter { WarmupScheduler.parseTime($0) != nil }
+        weekdaysOnly = try c.decodeIfPresent(Bool.self, forKey: .weekdaysOnly) ?? true
+        graceMinutes = try c.decodeIfPresent(Int.self, forKey: .graceMinutes) ?? 120
+        if !(5...720).contains(graceMinutes) { graceMinutes = 120 }
+    }
+}
+
 // MARK: - Config
 
 struct HUDConfig: Equatable {
@@ -205,6 +231,7 @@ struct HUDConfig: Equatable {
     var subscriptions: [Subscription] = []
     var rules: [RepoRule] = []
     var preferences = HUDPreferences()
+    var warmup = WarmupSchedule()
 
     static var defaultURL: URL {
         URL(fileURLWithPath: Home.directory + "/.notchhud/config.json")
@@ -279,6 +306,10 @@ struct HUDConfig: Equatable {
             // their accounts, so setup would only be in the way.
             cfg.preferences.onboardingCompleted = true
         }
+        if let raw = obj["warmup"], let data = try? JSONSerialization.data(withJSONObject: raw),
+           let warmup = try? decoder.decode(WarmupSchedule.self, from: data) {
+            cfg.warmup = warmup
+        }
         return cfg.deduplicatingCodex()
     }
 
@@ -349,12 +380,13 @@ struct HUDConfig: Equatable {
         var subscriptions: [Subscription]
         var rules: [RepoRule]
         var preferences: HUDPreferences
+        var warmup: WarmupSchedule
     }
 
     func save(to url: URL = defaultURL) throws {
         let shape = FileShape(version: Self.currentVersion, port: Int(port), terminalApp: terminalApp,
                               codexApp: codexApp, subscriptions: subscriptions, rules: rules,
-                              preferences: preferences)
+                              preferences: preferences, warmup: warmup)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(shape)

@@ -78,6 +78,12 @@ final class ConfigStore: ObservableObject {
 
     // MARK: Preferences
 
+    func updateWarmup(_ change: (inout WarmupSchedule) -> Void) {
+        var w = config.warmup
+        change(&w)
+        config.warmup = w
+    }
+
     func updatePreferences(_ change: (inout HUDPreferences) -> Void) {
         var prefs = config.preferences
         change(&prefs)

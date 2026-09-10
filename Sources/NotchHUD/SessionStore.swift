@@ -76,6 +76,8 @@ final class SessionStore: ObservableObject {
         guard let event = obj["hook_event_name"] as? String else { return }
         let id = (obj["session_id"] as? String) ?? "unknown"
         let cwd = (obj["cwd"] as? String) ?? byId[id]?.cwd ?? ""
+        // The scheduled warm-up's "hi" is bookkeeping, not a session to watch.
+        if cwd == WarmupScheduler.directory { return }
 
         switch event {
         case "SessionEnd":

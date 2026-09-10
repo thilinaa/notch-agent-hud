@@ -23,6 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.show(configStore: store.configStore, store: store, tab: tab)
             case "setup", "onboarding":
                 OnboardingWindowController.shared.show(configStore: store.configStore)
+            case "warmup":
+                // notchhud://warmup/run says hi to Claude now, as the schedule would.
+                if url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "run" { WarmupScheduler.shared.runNow() }
             case "alerts":
                 // notchhud://alerts/test posts one notification, to check the permission is in place.
                 if url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "test" { Notifier.deliverTest() }
@@ -78,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guardian = IdentityGuard(store: store)
         usageTracker = UsageTracker(store: store)
         usageAlerts = UsageAlerts(usage: usageTracker, configStore: configStore)
+        WarmupScheduler.shared.start(usage: usageTracker, configStore: configStore)
         panelManager = PanelManager(store: store, guardian: guardian, usage: usageTracker)
 
         // First run: walk through setup once the panels are up. The controller

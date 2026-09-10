@@ -213,7 +213,9 @@ struct AccentSwatches: View {
 
 struct GeneralPane: View {
     @ObservedObject var configStore: ConfigStore
+    @ObservedObject private var warmup = WarmupScheduler.shared
     private var prefs: HUDPreferences { configStore.config.preferences }
+    private var schedule: WarmupSchedule { configStore.config.warmup }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -339,6 +341,32 @@ struct GeneralPane: View {
                 .opacity(prefs.usageOnly ? 1 : 0.5)
             }
 
+            SettingsSection(title: "Window warm-up",
+                            footnote: "A 5-hour window starts with your first message and ends five hours later, whether that message was \u{201C}hi\u{201D} at 07:00 or real work at 09:00. Saying hi early puts the first reset in the middle of the day instead of the middle of the afternoon. Each run sends one word with `claude -p` from ~/.notchhud/warmup, using the login Claude Code is signed into, and is skipped when a window is already running. A Mac asleep at the scheduled time catches up within two hours.") {
+                SettingRow(title: "Start a window on a schedule", detail: "Runs while NotchHUD is open.") {
+                    Toggle("", isOn: Binding(
+                        get: { schedule.enabled },
+                        set: { new in configStore.updateWarmup { $0.enabled = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                }
+                SettingsDivider()
+                warmupTimes
+                SettingsDivider()
+                SettingRow(title: "Weekdays only", detail: "Skip Saturday and Sunday.") {
+                    Toggle("", isOn: Binding(
+                        get: { schedule.weekdaysOnly },
+                        set: { new in configStore.updateWarmup { $0.weekdaysOnly = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                }
+                SettingsDivider()
+                SettingRow(title: "Run now", detail: warmupLastRunText) {
+                    HStack(spacing: 8) {
+                        if warmup.running { ProgressView().controlSize(.small) }
+                        Button("Say hi now") { warmup.runNow() }.disabled(warmup.running)
+                    }
+                }
+            }
+
             SettingsSection(title: "Setup") {
                 SettingRow(title: "Run setup again", detail: "Walks through hooks, subscriptions, rules and permissions.") {
                     Button("Open setup…") {
@@ -347,6 +375,64 @@ struct GeneralPane: View {
                 }
             }
         }
+    }
+}
+
+// MARK: General → warm-up pieces
+
+private extension GeneralPane {
+    var warmupTimes: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Times").font(.system(size: 13, weight: .medium))
+                Text("Local time. One window per time; a second slot only matters if the first window has ended by then.")
+                    .font(.system(size: 11)).foregroundStyle(SettingsStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            VStack(alignment: .trailing, spacing: 6) {
+                ForEach(Array(schedule.times.enumerated()), id: \.offset) { index, time in
+                    HStack(spacing: 6) {
+                        DatePicker("", selection: Binding(
+                            get: { Self.date(from: time) },
+                            set: { new in configStore.updateWarmup { $0.times[index] = Self.string(from: new) } }
+                        ), displayedComponents: .hourAndMinute)
+                        .labelsHidden().datePickerStyle(.field).frame(width: 80)
+                        Button {
+                            configStore.updateWarmup { $0.times.remove(at: index) }
+                        } label: {
+                            Image(systemName: "minus.circle").foregroundStyle(SettingsStyle.secondary)
+                        }
+                        .buttonStyle(.plain).disabled(schedule.times.count == 1)
+                        .help("Remove this time")
+                    }
+                }
+                Button("Add time") {
+                    configStore.updateWarmup { w in
+                        let next = w.times.compactMap(WarmupScheduler.parseTime).map { $0.0 }.max().map { min(23, $0 + 5) } ?? 7
+                        w.times.append(String(format: "%02d:00", next))
+                    }
+                }
+                .disabled(schedule.times.count >= 4)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    var warmupLastRunText: String {
+        guard let last = warmup.runs.last else { return "No runs yet." }
+        let when = last.at.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        return "\(when) · \(last.outcome)"
+    }
+
+    static func date(from time: String) -> Date {
+        let (h, m) = WarmupScheduler.parseTime(time) ?? (7, 0)
+        return Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) ?? Date()
+    }
+
+    static func string(from date: Date) -> String {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
     }
 }
 
