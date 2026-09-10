@@ -11,6 +11,21 @@ struct WindowUsage {
     var tokens: Int? = nil
 
     var fraction: Double? { percent.map { min(1.0, $0 / 100) } }
+    /// Whole-number percent left, floored so "1% left" never rounds up to "0% left" while usable.
+    var remainingPercent: Int? { percent.map { max(0, Int((100 - $0).rounded(.down))) } }
+
+    /// The number a lane shows for this window, in the user's chosen mode.
+    /// Token estimates have no ceiling, so they read the same either way.
+    func valueText(_ mode: UsageValueMode) -> String {
+        if limitHit { return "Limit" }
+        if let percent {
+            switch mode {
+            case .used: return String(format: "%.0f%%", percent)
+            case .remaining: return "\(remainingPercent ?? 0)% left"
+            }
+        }
+        return "≈\(tokensText)"
+    }
 
     var tokensText: String {
         let t = tokens ?? 0

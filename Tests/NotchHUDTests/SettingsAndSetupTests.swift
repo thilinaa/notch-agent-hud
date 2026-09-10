@@ -36,6 +36,8 @@ final class SettingsAndSetupTests: XCTestCase {
         XCTAssertEqual(HUDConfig.parseV2(["subscriptions": []]).preferences, HUDPreferences())
         XCTAssertFalse(HUDPreferences().openOnHover, "click-to-open is the default")
         XCTAssertTrue(HUDConfig.parseV2(["subscriptions": [], "preferences": ["openOnHover": true]]).preferences.openOnHover)
+        XCTAssertEqual(HUDPreferences().usageValue, .used, "spent quota is the default reading")
+        XCTAssertEqual(HUDConfig.parseV2(["subscriptions": [], "preferences": ["usageValue": "remaining"]]).preferences.usageValue, .remaining)
 
         // A v2 file written before preferences existed, with named accounts: no setup nag.
         let early: [String: Any] = ["subscriptions": [[

@@ -121,6 +121,14 @@ enum HUDAppearance: String, Codable, CaseIterable {
     case system, light, dark
 }
 
+/// How a usage window reads: what has been spent, or what is still there.
+enum UsageValueMode: String, Codable, CaseIterable {
+    /// "34%" and a meter that fills as quota is spent.
+    case used
+    /// "66% left" and a meter that drains toward the reset.
+    case remaining
+}
+
 /// Pure UI preferences; every field has a default so a hand-edited file may
 /// omit any of them.
 struct HUDPreferences: Codable, Equatable {
@@ -139,11 +147,14 @@ struct HUDPreferences: Codable, Equatable {
     /// Expand the panel when the pointer rests on the pill. Off (default): the
     /// pill is click-to-open and stays open until clicked again.
     var openOnHover = false
+    /// Show quota as spent ("34%") or as what is left ("66% left").
+    var usageValue: UsageValueMode = .used
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
+        case usageValue
     }
 
     init(from decoder: Decoder) throws {
@@ -156,6 +167,7 @@ struct HUDPreferences: Codable, Equatable {
         onboardingCompleted = try c.decodeIfPresent(Bool.self, forKey: .onboardingCompleted) ?? false
         useUsageAPI = try c.decodeIfPresent(Bool.self, forKey: .useUsageAPI) ?? true
         openOnHover = try c.decodeIfPresent(Bool.self, forKey: .openOnHover) ?? false
+        usageValue = try c.decodeIfPresent(UsageValueMode.self, forKey: .usageValue) ?? .used
     }
 }
 

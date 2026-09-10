@@ -256,6 +256,7 @@ struct HUDView: View {
     /// Attention still surfaces in usage-only mode unless silenced.
     private var showsAttention: Bool { !usageOnly || prefs.attentionBreaksThrough }
     private var accentColor: Color { prefs.accent.color }
+    private var usageValueMode: UsageValueMode { prefs.usageValue }
 
     /// Jump to the session's terminal and get the panel out of the way.
     private func focus(_ s: AgentSession) {
@@ -281,10 +282,7 @@ struct HUDView: View {
         usage.subs.prefix(3).compactMap { sub in
             let windows = [sub.fiveHour, sub.weekly].compactMap { $0 }.filter { $0.resetsAt > Date() }
             guard let tightest = windows.max(by: { ($0.percent ?? -1) < ($1.percent ?? -1) }) else { return nil }
-            let value: String
-            if tightest.limitHit { value = "limit" }
-            else if let percent = tightest.percent { value = "\(Int(percent.rounded()))%" }
-            else { value = "≈\(tightest.tokensText)" }
+            let value = tightest.limitHit ? "limit" : tightest.valueText(usageValueMode)
             return PillUsage(id: sub.id, label: sub.lane.label,
                              accent: hasNotch ? sub.lane.accent.onBlack : sub.lane.accent.color,
                              value: value, hot: tightest.limitHit || (tightest.percent ?? 0) > 60)
@@ -857,7 +855,8 @@ struct HUDView: View {
             HStack {
                 Text("Usage").font(.system(size: 12, weight: .medium))
                 Spacer()
-                Text("5 hour / Weekly").font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
+                Text(usageValueMode == .remaining ? "Left · 5 hour / Weekly" : "5 hour / Weekly")
+                    .font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: min(3, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
                 ForEach(usage.subs) { sub in
@@ -902,16 +901,15 @@ struct HUDView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(name).font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
                 Spacer(minLength: 2)
-                Text(usageValue(w)).font(.system(size: 12, weight: .medium, design: .monospaced))
+                Text(w.map { $0.valueText(usageValueMode) } ?? "—")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(w?.limitHit == true ? Palette.mismatch : HUDStyle.text)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(HUDStyle.line)
-                    if let fraction = w?.fraction {
-                        Capsule().fill(tint).frame(width: geo.size.width * max(0, min(1, fraction)))
-                    } else if w?.limitHit == true {
-                        Capsule().fill(tint)
+                    if let fraction = meterFraction(w) {
+                        Capsule().fill(tint).frame(width: geo.size.width * fraction)
                     }
                 }
             }.frame(height: 4)
@@ -924,11 +922,17 @@ struct HUDView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func usageValue(_ w: WindowUsage?) -> String {
-        guard let w else { return "—" }
-        if w.limitHit { return "Limit" }
-        if let percent = w.percent { return String(format: "%.0f%%", percent) }
-        return "≈\(w.tokensText)"
+    /// How much of the meter is filled: spent quota in Used mode, what is
+    /// left in Remaining mode (so the bar drains and agrees with the number).
+    /// A limit with no percent fills in Used mode and empties in Remaining.
+    private func meterFraction(_ w: WindowUsage?) -> CGFloat? {
+        guard let w else { return nil }
+        let used: Double
+        if let fraction = w.fraction { used = fraction }
+        else if w.limitHit { used = 1 }
+        else { return nil }
+        let shown = usageValueMode == .remaining ? 1 - used : used
+        return CGFloat(max(0, min(1, shown)))
     }
 
     private func resetText(_ date: Date) -> String {

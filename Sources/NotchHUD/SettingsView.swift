@@ -259,6 +259,19 @@ struct GeneralPane: View {
                 }
             }
 
+            SettingsSection(title: "Usage") {
+                SettingRow(title: "Show quota as", detail: "Used counts up from zero. Remaining counts down to the reset, and the meter drains with it.") {
+                    Picker("", selection: Binding(
+                        get: { prefs.usageValue },
+                        set: { new in configStore.updatePreferences { $0.usageValue = new } }
+                    )) {
+                        Text("Used").tag(UsageValueMode.used)
+                        Text("Remaining").tag(UsageValueMode.remaining)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 180)
+                }
+            }
+
             SettingsSection(title: "Usage only",
                             footnote: "Sessions keep being tracked in the background, so switching back is instant.") {
                 SettingRow(title: "Show only usage and account health",
