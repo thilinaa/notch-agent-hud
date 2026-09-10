@@ -166,12 +166,14 @@ struct HUDPreferences: Codable, Equatable {
     var usageAlerts = true
     /// Percent spent at which the "nearing the limit" alert fires.
     var alertThreshold = 80
+    /// Ask GitHub for the latest release at launch and every six hours.
+    var checkForUpdates = true
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
-        case usageValue, usageMeter, pillShowsUsage, usageAlerts, alertThreshold
+        case usageValue, usageMeter, pillShowsUsage, usageAlerts, alertThreshold, checkForUpdates
     }
 
     init(from decoder: Decoder) throws {
@@ -190,6 +192,7 @@ struct HUDPreferences: Codable, Equatable {
         usageAlerts = try c.decodeIfPresent(Bool.self, forKey: .usageAlerts) ?? true
         alertThreshold = try c.decodeIfPresent(Int.self, forKey: .alertThreshold) ?? 80
         if !(1...99).contains(alertThreshold) { alertThreshold = 80 }
+        checkForUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? true
     }
 }
 

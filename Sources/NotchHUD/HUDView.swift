@@ -270,6 +270,7 @@ private struct StaggerReveal: ViewModifier {
 struct HUDView: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var usage: UsageTracker
+    @ObservedObject private var updater = Updater.shared
     let hasNotch: Bool
     let notchWidth: CGFloat
     let collapsedWidth: CGFloat
@@ -666,6 +667,7 @@ struct HUDView: View {
             HStack(spacing: 6) {
                 NotchHUDLogo().foregroundStyle(HUDStyle.secondary)
                 Text("NotchHUD").font(.system(size: 11, weight: .medium)).foregroundStyle(HUDStyle.secondary)
+                updateBadge
                 Spacer()
                 footerIcon("gearshape", key: "settings", help: "Settings") {
                     // The panel gets out of the way; settings is a normal window.
@@ -686,6 +688,36 @@ struct HUDView: View {
                 .help("Quit NotchHUD")
                 .accessibilityLabel("Quit NotchHUD")
             }.padding(.top, 6)
+        }
+    }
+
+    /// "Update to 0.2.1" beside the app name while a newer release is known;
+    /// progress while it installs. Quiet otherwise.
+    @ViewBuilder
+    private var updateBadge: some View {
+        switch updater.state {
+        case .available(let release):
+            Button { updater.install() } label: {
+                Text("Update to \(release.version)")
+                    .font(.system(size: 10, weight: .medium)).foregroundStyle(accentColor)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .overlay(Capsule().strokeBorder(accentColor.opacity(0.45)))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Download and install NotchHUD \(release.version), then relaunch. Release notes are in Settings → General → Updates.")
+        case .downloading(let release, let fraction):
+            HStack(spacing: 5) {
+                ProgressView(value: fraction).progressViewStyle(.linear).frame(width: 60)
+                Text("Downloading \(release.version)").font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
+            }
+        case .installing(let release):
+            HStack(spacing: 5) {
+                ProgressView().controlSize(.mini)
+                Text("Installing \(release.version)").font(.system(size: 10)).foregroundStyle(HUDStyle.secondary)
+            }
+        default:
+            EmptyView()
         }
     }
 

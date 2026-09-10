@@ -30,6 +30,7 @@
 - **GitHub account guard.** Reads the active `gh` account and warns when it does not match the one your rules expect for the repository you are working in, with a one-click *Switch*.
 - **Multiple accounts, your labels.** Two work accounts, two personal ones, whatever you have. You name them; the app never guesses what a label means.
 - **Three densities**, light and dark, a **usage-only mode** for when you just want a quota meter, and a setup flow that takes about a minute.
+- **Updates itself.** When a newer release is on GitHub, an *Update to x.y.z* button appears in the panel footer. It downloads the notarized disk image, verifies the published checksum and Gatekeeper's verdict, replaces the app, and relaunches.
 
 <p align="center">
   <img src="docs/screenshots/pill.png" width="600" alt="The collapsed pill around the notch">
@@ -69,6 +70,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
   - **Usage** — show quota as *Used* (`34%`, a meter that fills) or *Remaining* (`66% left`, a meter that drains); the meter as *Bars* or *Rings* (the week nested inside the 5-hour window, tightest number in the middle); and *Quota on the pill*, which puts the subscription closest to a limit where "All clear" would be.
   - **Alerts** — one notification when a window crosses the threshold (50/70/80/90%), one when it hits the limit, and one when a window that ran hot resets. macOS asks once to allow them; *Send a test* checks the permission.
   - **Window warm-up** — a 5-hour window starts with your first message and ends five hours later, whether that was "hi" at 07:00 or real work at 09:00. Set one or more times (weekdays only by default) and NotchHUD runs `claude -p hi` from `~/.notchhud/warmup` at that moment, using the login Claude Code is signed into. It is skipped when a window is already running, a Mac asleep at the time catches up within two hours, and the last outcome shows in Settings. Each run costs one short message.
+  - **Updates** — automatic checks at launch and every six hours (one anonymous request to GitHub; switch it off here), a *Check now* button, and *Install* when a newer release exists.
   - **Usage-only mode** — the pill shows each subscription's tightest window as a colored dot and percentage, and the panel shows just the usage grid and the GitHub guard. Sessions that need you still break through unless you silence that too.
 - **Subscriptions** — the logins you own. Rename each in your own words, pick a lane color, hide a lane without deleting it, remove accounts you no longer use. Logins the HUD has seen but you have not named appear under *Seen on this Mac* with a one-click *Name it*. Codex is listed once it is detected.
 - **Rules** — folder and GitHub-owner rules, each with an expected subscription and an expected `gh` account. Owner rules beat folder rules, and among folders the longest match wins. Folders come from a picker or from suggestions based on where your sessions actually run.
@@ -106,7 +108,7 @@ Open Settings from the gear icon in the panel footer or with `open notchhud://se
     "usageOnly": false, "attentionBreaksThrough": true, "onboardingCompleted": true,
     "useUsageAPI": true, "openOnHover": false,
     "usageValue": "used", "usageMeter": "bars", "pillShowsUsage": false,
-    "usageAlerts": true, "alertThreshold": 80
+    "usageAlerts": true, "alertThreshold": 80, "checkForUpdates": true
   },
   "warmup": { "enabled": false, "times": ["07:00"], "weekdaysOnly": true, "graceMinutes": 120 }
 }
@@ -129,10 +131,11 @@ Older v1 files (`claudeAccounts`, `pathAccounts`, `ownerAccounts`) are migrated 
 | `notchhud://panel/open` · `/close` | Pin the panel open or collapse it, for scripts and screenshots |
 | `notchhud://warmup/run` | Say hi to Claude now, as the warm-up schedule would |
 | `notchhud://alerts/test` | Post one test notification |
+| `notchhud://update/check` · `/install` | Ask GitHub for the latest release now; install a release the app already knows is newer |
 
 ## Privacy
 
-Everything stays on your Mac. The only network call NotchHUD makes itself is to `api.anthropic.com` for the active login's usage, using the token Claude Code already holds; the token is never persisted or logged, the response is never cached to disk, and the whole thing can be switched off in Advanced. The warm-up, when you turn it on, runs the `claude` command line the same way you would, and that sends one short message to your Claude account. The HUD reads `~/.claude` transcripts and `~/.codex` rollouts to detect sessions and estimate usage, runs `git` to read a repository's origin, and reads the `gh` CLI's `hosts.yml` to know which account is active. No analytics, no update checks.
+Everything stays on your Mac. NotchHUD makes two kinds of network call. One is to `api.anthropic.com` for the active login's usage, using the token Claude Code already holds; the token is never persisted or logged, the response is never cached to disk, and the whole thing can be switched off in Advanced. The other is an anonymous request to `api.github.com` for the latest release, at launch and every six hours, carrying nothing about you; switch it off under General → Updates. Installing an update downloads the disk image from GitHub Releases. The warm-up, when you turn it on, runs the `claude` command line the same way you would, and that sends one short message to your Claude account. The HUD reads `~/.claude` transcripts and `~/.codex` rollouts to detect sessions and estimate usage, runs `git` to read a repository's origin, and reads the `gh` CLI's `hosts.yml` to know which account is active. No analytics.
 
 ## Build from source
 

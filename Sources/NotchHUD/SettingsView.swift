@@ -214,6 +214,7 @@ struct AccentSwatches: View {
 
 struct GeneralPane: View {
     @ObservedObject var configStore: ConfigStore
+    @ObservedObject private var updater = Updater.shared
     @ObservedObject private var warmup = WarmupScheduler.shared
     @ObservedObject private var notifications = NotificationStatus.shared
     private var prefs: HUDPreferences { configStore.config.preferences }
@@ -377,6 +378,38 @@ struct GeneralPane: View {
                 }
             }
 
+            SettingsSection(title: "Updates",
+                            footnote: "Checking asks GitHub for the latest release: one anonymous request, nothing about you or your usage. Installing downloads the notarized disk image, verifies its published checksum and Gatekeeper's verdict, replaces the app and relaunches it.") {
+                SettingRow(title: "Check for updates automatically", detail: "At launch and every six hours.") {
+                    Toggle("", isOn: Binding(
+                        get: { prefs.checkForUpdates },
+                        set: { new in configStore.updatePreferences { $0.checkForUpdates = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                    .disabled(!updater.isReleaseBuild)
+                }
+                SettingsDivider()
+                SettingRow(title: "NotchHUD \(updater.currentVersion)", detail: updateStatusText) {
+                    HStack(spacing: 8) {
+                        switch updater.state {
+                        case .available(let release):
+                            Button("What's new") { NSWorkspace.shared.open(release.pageURL) }
+                            Button("Install \(release.version)") { updater.install() }.keyboardShortcut(.defaultAction)
+                        case .downloading(_, let fraction):
+                            ProgressView(value: fraction).frame(width: 120)
+                        case .installing:
+                            ProgressView().controlSize(.small)
+                        case .checking:
+                            ProgressView().controlSize(.small)
+                        default:
+                            if case .failed = updater.state, let latest = updater.latest {
+                                Button("Release page") { NSWorkspace.shared.open(latest.pageURL) }
+                            }
+                            Button("Check now") { updater.check() }.disabled(!updater.isReleaseBuild)
+                        }
+                    }
+                }
+            }
+
             SettingsSection(title: "Setup") {
                 SettingRow(title: "Run setup again", detail: "Walks through hooks, subscriptions, rules and permissions.") {
                     Button("Open setup…") {
@@ -427,6 +460,19 @@ private extension GeneralPane {
             }
         }
         .padding(.vertical, 10)
+    }
+
+    var updateStatusText: String {
+        guard updater.isReleaseBuild else { return "Development build; updates apply to installed releases." }
+        switch updater.state {
+        case .idle: return "Not checked yet."
+        case .checking: return "Checking GitHub…"
+        case .upToDate(let when): return "Up to date · checked \(when.formatted(date: .omitted, time: .shortened))"
+        case .available(let r): return "Version \(r.version) is available."
+        case .downloading(let r, let f): return "Downloading \(r.version) · \(Int(f * 100))%"
+        case .installing(let r): return "Installing \(r.version)… NotchHUD relaunches when done."
+        case .failed(let message): return "Update failed: \(message)"
+        }
     }
 
     var warmupLastRunText: String {
