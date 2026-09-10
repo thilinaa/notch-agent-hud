@@ -292,6 +292,32 @@ struct GeneralPane: View {
                 .opacity(prefs.usageOnly ? 0.5 : 1)
             }
 
+            SettingsSection(title: "Alerts",
+                            footnote: "Delivered through Notification Center; macOS asks once to allow them. A window that ran past the threshold also announces when it resets.") {
+                SettingRow(title: "Notify when a window nears its limit", detail: "One alert per window when it crosses the threshold, one when the limit is hit.") {
+                    Toggle("", isOn: Binding(
+                        get: { prefs.usageAlerts },
+                        set: { new in configStore.updatePreferences { $0.usageAlerts = new } }
+                    )).toggleStyle(.switch).labelsHidden()
+                }
+                SettingsDivider()
+                SettingRow(title: "Threshold", detail: "Spent share of a window that counts as nearing the limit.") {
+                    Picker("", selection: Binding(
+                        get: { prefs.alertThreshold },
+                        set: { new in configStore.updatePreferences { $0.alertThreshold = new } }
+                    )) {
+                        ForEach([50, 70, 80, 90], id: \.self) { Text("\($0)%").tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 200)
+                    .disabled(!prefs.usageAlerts)
+                }
+                .opacity(prefs.usageAlerts ? 1 : 0.5)
+                SettingsDivider()
+                SettingRow(title: "Test", detail: Notifier.available ? "Sends one notification now." : "Available when NotchHUD runs as an app bundle.") {
+                    Button("Send a test") { Notifier.deliverTest() }.disabled(!Notifier.available)
+                }
+            }
+
             SettingsSection(title: "Usage only",
                             footnote: "Sessions keep being tracked in the background, so switching back is instant.") {
                 SettingRow(title: "Show only usage and account health",

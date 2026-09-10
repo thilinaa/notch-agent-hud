@@ -162,12 +162,16 @@ struct HUDPreferences: Codable, Equatable {
     /// In the normal (sessions) mode, the pill's quiet side shows the tightest
     /// quota window instead of "All clear".
     var pillShowsUsage = false
+    /// Notification Center alerts when a window nears its limit, hits it, or resets.
+    var usageAlerts = true
+    /// Percent spent at which the "nearing the limit" alert fires.
+    var alertThreshold = 80
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case density, appearance, accent, usageOnly, attentionBreaksThrough, onboardingCompleted, useUsageAPI, openOnHover
-        case usageValue, usageMeter, pillShowsUsage
+        case usageValue, usageMeter, pillShowsUsage, usageAlerts, alertThreshold
     }
 
     init(from decoder: Decoder) throws {
@@ -183,6 +187,9 @@ struct HUDPreferences: Codable, Equatable {
         usageValue = try c.decodeIfPresent(UsageValueMode.self, forKey: .usageValue) ?? .used
         usageMeter = try c.decodeIfPresent(UsageMeterStyle.self, forKey: .usageMeter) ?? .bars
         pillShowsUsage = try c.decodeIfPresent(Bool.self, forKey: .pillShowsUsage) ?? false
+        usageAlerts = try c.decodeIfPresent(Bool.self, forKey: .usageAlerts) ?? true
+        alertThreshold = try c.decodeIfPresent(Int.self, forKey: .alertThreshold) ?? 80
+        if !(1...99).contains(alertThreshold) { alertThreshold = 80 }
     }
 }
 

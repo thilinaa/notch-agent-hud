@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var codexWatcher: CodexWatcher!
     private var guardian: IdentityGuard!
     private var usageTracker: UsageTracker!
+    private var usageAlerts: UsageAlerts!
     private var panelManager: PanelManager!
 
     /// `notchhud://settings` opens the settings window (used by onboarding
@@ -22,6 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.show(configStore: store.configStore, store: store, tab: tab)
             case "setup", "onboarding":
                 OnboardingWindowController.shared.show(configStore: store.configStore)
+            case "alerts":
+                // notchhud://alerts/test posts one notification, to check the permission is in place.
+                if url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "test" { Notifier.deliverTest() }
             case "panel":
                 // notchhud://panel/open pins the panel open; /close collapses it. Handy for scripts and screenshots.
                 let open = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) != "close"
@@ -73,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codexWatcher = CodexWatcher(store: store)
         guardian = IdentityGuard(store: store)
         usageTracker = UsageTracker(store: store)
+        usageAlerts = UsageAlerts(usage: usageTracker, configStore: configStore)
         panelManager = PanelManager(store: store, guardian: guardian, usage: usageTracker)
 
         // First run: walk through setup once the panels are up. The controller
