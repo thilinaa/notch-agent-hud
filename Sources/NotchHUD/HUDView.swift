@@ -1249,7 +1249,8 @@ struct HUDView: View {
     private func resetText(_ date: Date) -> String {
         let minutes = max(1, Int(ceil(date.timeIntervalSinceNow / 60)))
         if minutes < 1440 { return "Resets in \(durationText(until: date))" }
-        return "Resets " + date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        // A weekday alone is ambiguous when the reset is nearly a week out; the date settles it.
+        return "Resets " + date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
     }
 
     private func durationText(until date: Date) -> String {
