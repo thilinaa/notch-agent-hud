@@ -309,7 +309,13 @@ final class UsageTracker: ObservableObject {
         let label: String       // "5h" / "1w"
         let percent: Double
         let resetsAt: Date
+        /// Other limit buckets with usage in this window ("bengalfox 12%").
+        var splits: [WindowSplit] = []
     }
+
+    /// The account-level bucket. Codex also reports per-model buckets such as
+    /// `codex_bengalfox`, often at 0%, and the newest report may be one of those.
+    nonisolated static let codexAccountLimit = "codex"
 
     private var codexWindows: [CodexWindow] = []
 
@@ -374,6 +380,9 @@ final class UsageTracker: ObservableObject {
         }
         candidates.sort { $0.mtime > $1.mtime }
 
+        // Freshest report per limit bucket, newest files and last lines first.
+        var latest: [String: [String: Any]] = [:]
+        var order: [String] = []
         for (path, _) in candidates.prefix(6) {
             guard let fh = FileHandle(forReadingAtPath: path) else { continue }
             defer { try? fh.close() }
@@ -382,7 +391,6 @@ final class UsageTracker: ObservableObject {
             try? fh.seek(toOffset: size > tail ? size - tail : 0)
             guard let data = try? fh.readToEnd() else { continue }
             let text = String(decoding: data, as: UTF8.self)
-            // Last populated rate_limits line wins.
             for line in text.split(separator: "\n").reversed() {
                 guard line.contains("\"rate_limits\":{"),
                       let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
@@ -391,11 +399,32 @@ final class UsageTracker: ObservableObject {
                 let rlAny = payload["rate_limits"]
                     ?? (payload["info"] as? [String: Any])?["rate_limits"]
                 guard let rl = rlAny as? [String: Any] else { continue }
-                let out = codexWindows(from: rl)
-                if !out.isEmpty { return out }
+                let id = (rl["limit_id"] as? String) ?? codexAccountLimit
+                if latest[id] == nil { latest[id] = rl; order.append(id) }
+            }
+            if latest[codexAccountLimit] != nil { break }  // the bucket that matters is in hand
+        }
+        return codexWindows(fromBuckets: latest, order: order)
+    }
+
+    /// The account bucket's windows, with any other bucket that has spent
+    /// something attached as a split. Without an account bucket, the freshest
+    /// report stands in.
+    nonisolated static func codexWindows(fromBuckets buckets: [String: [String: Any]], order: [String],
+                                         now: Date = Date()) -> [CodexWindow] {
+        let mainID = buckets[codexAccountLimit] != nil ? codexAccountLimit : order.first
+        guard let mainID, let main = buckets[mainID] else { return [] }
+        var windows = codexWindows(from: main, now: now)
+        for id in order where id != mainID {
+            guard let rl = buckets[id] else { continue }
+            let label = id.hasPrefix(codexAccountLimit + "_") ? String(id.dropFirst(codexAccountLimit.count + 1)) : id
+            for w in codexWindows(from: rl, now: now) where w.percent > 0 {
+                if let index = windows.firstIndex(where: { $0.label == w.label }) {
+                    windows[index].splits.append(WindowSplit(label: label, percent: w.percent))
+                }
             }
         }
-        return []
+        return windows
     }
 
     /// Codex names its windows `primary` and `secondary` by position, not by
@@ -527,7 +556,8 @@ final class UsageTracker: ObservableObject {
             func window(_ label: String) -> WindowUsage? {
                 codexWindows.first { $0.label == label }.map {
                     WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent,
-                                length: label == "1w" ? WindowUsage.oneWeek : WindowUsage.fiveHours)
+                                length: label == "1w" ? WindowUsage.oneWeek : WindowUsage.fiveHours,
+                                splits: $0.splits.sorted { $0.percent > $1.percent })
                 }
             }
             result.append(SubscriptionUsage(lane: config.codexLane, fiveHour: window("5h"), weekly: window("1w")))
