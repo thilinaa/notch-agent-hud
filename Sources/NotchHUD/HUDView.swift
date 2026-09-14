@@ -987,7 +987,7 @@ struct HUDView: View {
                 .help("Refresh usage now")
                 .accessibilityLabel("Refresh usage")
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: min(3, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14, alignment: .topLeading), count: min(2, max(1, usage.subs.count))), alignment: .leading, spacing: 16) {
                 ForEach(usage.subs) { sub in
                     VStack(alignment: .leading, spacing: 7) {
                         Text(sub.lane.provider == .codex ? "Codex" : "Claude").font(.system(size: 12, weight: .medium))

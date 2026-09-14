@@ -171,11 +171,13 @@ final class UsageTracker: ObservableObject {
             Task { @MainActor in
                 self?.scan()
                 self?.fetchClaudeAPIUsage()
+                self?.fetchCodexAPIUsage()
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             self?.scan()
             self?.fetchClaudeAPIUsage()
+            self?.fetchCodexAPIUsage()
         }
     }
 
@@ -185,8 +187,11 @@ final class UsageTracker: ObservableObject {
         refreshing = true
         lastAPIFetch = .distantPast
         apiRetryInterval = 120
+        lastCodexFetch = .distantPast
+        codexRetryInterval = 120
         scan()
         fetchClaudeAPIUsage()
+        fetchCodexAPIUsage()
         if !config.preferences.useUsageAPI { refreshing = false }
     }
 
@@ -322,6 +327,10 @@ final class UsageTracker: ObservableObject {
     // Authoritative Claude usage from the OAuth endpoint, for the ACTIVE login
     // only (read-only Keychain access — other accounts stay estimate-based).
     private var apiByLane: [String: ClaudeUsageAPI.Windows] = [:]
+    /// Exact Codex windows from the usage endpoint; rollout reports stand in when nil.
+    private var codexAPIWindows: [CodexWindow]?
+    private var lastCodexFetch: Date = .distantPast
+    private var codexRetryInterval: TimeInterval = 120
     private var lastAPIFetch: Date = .distantPast
     /// Grows after failures so a denied Keychain prompt or an offline Mac is
     /// not retried every two minutes; resets on the next success.
@@ -340,8 +349,9 @@ final class UsageTracker: ObservableObject {
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 if let windows {
-                    // The active login moved? Keep only the current lane's data.
-                    self.apiByLane = [lane: windows]
+                    // Other logins keep their last exact figures until those windows expire,
+                    // so switching accounts does not empty the other row.
+                    self.apiByLane[lane] = windows
                     self.apiRetryInterval = 120
                     self.lastAPISuccess = Date()
                 } else {
@@ -349,6 +359,29 @@ final class UsageTracker: ObservableObject {
                     self.lastAPIFailure = Date()
                 }
                 self.refreshing = false
+                self.recompute()
+            }
+        }
+    }
+
+    private func fetchCodexAPIUsage() {
+        guard config.preferences.useUsageAPI else {
+            if codexAPIWindows != nil { codexAPIWindows = nil; recompute() }
+            return
+        }
+        guard Date().timeIntervalSince(lastCodexFetch) > codexRetryInterval else { return }
+        lastCodexFetch = Date()
+        Task.detached { [weak self] in
+            let windows = await CodexUsageAPI.fetch()
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if let windows {
+                    self.codexAPIWindows = windows
+                    self.codexRetryInterval = 120
+                    self.lastAPISuccess = Date()
+                } else {
+                    self.codexRetryInterval = min(self.codexRetryInterval * 2, 3600)
+                }
                 self.recompute()
             }
         }
@@ -552,9 +585,16 @@ final class UsageTracker: ObservableObject {
                 > ($1.fiveHour?.percent ?? Double($1.fiveHour?.tokens ?? 0) / 1_000_000)
         }
 
-        if !codexWindows.isEmpty {
+        // Every named Claude account keeps its row, even between windows, so
+        // switching logins never makes the other one vanish.
+        for sub in config.subscriptions where sub.provider == .claude && !result.contains(where: { $0.lane.id == sub.id }) {
+            result.append(SubscriptionUsage(lane: config.lane(for: sub), fiveHour: nil, weekly: nil))
+        }
+
+        let liveCodex = (codexAPIWindows ?? codexWindows).filter { $0.resetsAt > Date() }
+        if !liveCodex.isEmpty || config.hasCodex {
             func window(_ label: String) -> WindowUsage? {
-                codexWindows.first { $0.label == label }.map {
+                liveCodex.first { $0.label == label }.map {
                     WindowUsage(resetsAt: $0.resetsAt, limitHit: $0.percent >= 100, percent: $0.percent,
                                 length: label == "1w" ? WindowUsage.oneWeek : WindowUsage.fiveHours,
                                 splits: $0.splits.sorted { $0.percent > $1.percent })

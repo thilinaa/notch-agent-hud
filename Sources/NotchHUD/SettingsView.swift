@@ -877,8 +877,8 @@ struct AdvancedPane: View {
             }
 
             SettingsSection(title: "Usage data",
-                            footnote: "On: the active Claude login's OAuth token is read from the Keychain (the item Claude Code maintains) and sent only to api.anthropic.com, so the usage strip shows exact percentages. macOS may ask once to allow NotchHUD access; choose Always Allow. Off: estimates from transcripts only, and the Keychain is never touched.") {
-                SettingRow(title: "Exact usage from Anthropic's API", detail: "Same numbers as /usage inside Claude Code.") {
+                            footnote: "On: the active Claude login's OAuth token is read from the Keychain (the item Claude Code maintains) and sent only to api.anthropic.com; Codex's token is read from ~/.codex/auth.json and sent only to chatgpt.com. Both give the exact percentages their own apps show. macOS may ask once to allow Keychain access; choose Always Allow. Off: estimates from transcripts and rollouts only, and neither token is touched.") {
+                SettingRow(title: "Exact usage from the providers' APIs", detail: "Same numbers as /usage inside Claude Code and the usage panel in the Codex app.") {
                     Toggle("", isOn: Binding(
                         get: { configStore.config.preferences.useUsageAPI },
                         set: { new in configStore.updatePreferences { $0.useUsageAPI = new } }
