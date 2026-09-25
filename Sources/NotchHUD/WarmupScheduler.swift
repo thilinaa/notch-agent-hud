@@ -95,8 +95,8 @@ final class WarmupScheduler: ObservableObject {
     /// "5-hour window already running (39%, resets in 54m)" for the active
     /// Claude login, or nil when no window is live (or nothing is known).
     private func liveWindowDescription() -> String? {
-        guard let usage, let config = configStore?.config else { return nil }
-        let lane = AccountDetection.activeClaudeEmail().map { config.lane(forEmail: $0).id } ?? Lane.unknownID
+        guard let usage else { return nil }
+        let lane = usage.activeClaudeLaneID
         guard let sub = usage.subs.first(where: { $0.lane.id == lane }),
               let w = sub.fiveHour, w.resetsAt > Date(),
               (w.percent ?? 0) > 0 || (w.tokens ?? 0) > 0 else { return nil }

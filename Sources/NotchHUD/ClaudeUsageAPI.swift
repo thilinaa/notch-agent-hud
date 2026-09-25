@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Fetches authoritative Claude usage (the same data Claude Code's /usage screen
 /// shows): 5-hour and weekly utilization percentages with reset times, via the
@@ -7,7 +8,18 @@ import Foundation
 /// Read-only: never refreshes or writes credentials — so only the ACTIVE login
 /// (whose token Claude Code keeps fresh) gets authoritative data; other
 /// accounts' lanes fall back to transcript estimates. (Deliberate choice.)
+///
+/// The numbers are filed under the login the token belongs to, as the profile
+/// endpoint names it. `~/.claude.json` is no guide: every Claude Code process
+/// writes its own login there, so with the terminal on one account and the
+/// desktop app on another it flips between them while the Keychain token stays put.
 enum ClaudeUsageAPI {
+    /// Exact usage and the login it was measured for.
+    struct Reading: Sendable {
+        let email: String
+        let windows: Windows
+    }
+
     struct Windows: Sendable {
         var fiveHour: (percent: Double, resetsAt: Date)?
         var weekly: (percent: Double, resetsAt: Date)?
@@ -41,20 +53,56 @@ enum ClaudeUsageAPI {
         return token
     }
 
-    nonisolated static func fetch() async -> Windows? {
-        guard let token = accessToken(),
-              let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return nil }
+    nonisolated static func fetch() async -> Reading? {
+        guard let token = accessToken() else { return nil }
+        // Ephemeral: nothing about these requests or responses touches the disk cache.
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        let key = fingerprint(token)
+        var email = await owners.email(for: key)
+        if email == nil, let profile = await get("profile", token: token, session: session) {
+            email = parseOwner(profile)
+            if let email { await owners.remember(email, for: key) }
+        }
+        // Numbers nobody can be named for would land on the wrong row; skip them.
+        guard let email, let obj = await get("usage", token: token, session: session),
+              let windows = parse(obj) else { return nil }
+        return Reading(email: email, windows: windows)
+    }
+
+    nonisolated private static func get(_ endpoint: String, token: String,
+                                        session: URLSession) async -> [String: Any]? {
+        guard let url = URL(string: "https://api.anthropic.com/api/oauth/" + endpoint) else { return nil }
         var req = URLRequest(url: url, timeoutInterval: 10)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Ephemeral: nothing about this request or response touches the disk cache.
-        let session = URLSession(configuration: .ephemeral)
-        defer { session.finishTasksAndInvalidate() }
         guard let (data, resp) = try? await session.data(for: req),
-              (resp as? HTTPURLResponse)?.statusCode == 200,
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return parse(obj)
+              (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    /// The login a token belongs to, from the profile response's `account.email`.
+    nonisolated static func parseOwner(_ obj: [String: Any]) -> String? {
+        guard let email = (obj["account"] as? [String: Any])?["email"] as? String else { return nil }
+        let key = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return key.isEmpty ? nil : key
+    }
+
+    /// Who owns each token seen, so the profile is asked once per token rather
+    /// than on every fetch. Keyed by a digest; the token itself is not kept.
+    private actor Owners {
+        private var byToken: [String: String] = [:]
+        func email(for key: String) -> String? { byToken[key] }
+        func remember(_ email: String, for key: String) {
+            if byToken.count >= 16 { byToken.removeAll() }  // tokens rotate every few hours
+            byToken[key] = email
+        }
+    }
+    private static let owners = Owners()
+
+    nonisolated private static func fingerprint(_ token: String) -> String {
+        SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The response shape: `five_hour` / `seven_day` objects with `utilization`

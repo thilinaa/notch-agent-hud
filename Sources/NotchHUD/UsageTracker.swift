@@ -217,7 +217,7 @@ final class UsageTracker: ObservableObject {
         if let s = store?.sessions.first(where: { $0.transcriptPath == path }), let email = s.account {
             return config.lane(forEmail: email).id
         }
-        return activeClaudeLane()
+        return activeClaudeLaneID
     }
 
     private var scanning = false
@@ -327,6 +327,8 @@ final class UsageTracker: ObservableObject {
     // Authoritative Claude usage from the OAuth endpoint, for the ACTIVE login
     // only (read-only Keychain access — other accounts stay estimate-based).
     private var apiByLane: [String: ClaudeUsageAPI.Windows] = [:]
+    /// Lane of the login the Keychain token belongs to, as the endpoint named it.
+    private var tokenLaneID: String?
     /// Exact Codex windows from the usage endpoint; rollout reports stand in when nil.
     private var codexAPIWindows: [CodexWindow]?
     private var lastCodexFetch: Date = .distantPast
@@ -338,20 +340,22 @@ final class UsageTracker: ObservableObject {
 
     private func fetchClaudeAPIUsage() {
         guard config.preferences.useUsageAPI else {
+            tokenLaneID = nil
             if !apiByLane.isEmpty { apiByLane = [:]; recompute() }
             return
         }
         guard Date().timeIntervalSince(lastAPIFetch) > apiRetryInterval else { return }
         lastAPIFetch = Date()
-        let lane = activeClaudeLane()
         Task.detached { [weak self] in
-            let windows = await ClaudeUsageAPI.fetch()
+            let reading = await ClaudeUsageAPI.fetch()
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                if let windows {
+                if let reading {
                     // Other logins keep their last exact figures until those windows expire,
                     // so switching accounts does not empty the other row.
-                    self.apiByLane[lane] = windows
+                    let lane = self.config.lane(forEmail: reading.email).id
+                    self.apiByLane[lane] = reading.windows
+                    self.tokenLaneID = lane
                     self.apiRetryInterval = 120
                     self.lastAPISuccess = Date()
                 } else {
@@ -387,9 +391,13 @@ final class UsageTracker: ObservableObject {
         }
     }
 
-    /// Lane of the login Claude Code is using now (honours CLAUDE_CONFIG_DIR like the relay does).
-    private func activeClaudeLane() -> String {
-        AccountDetection.activeClaudeEmail().map { config.lane(forEmail: $0).id } ?? Lane.unknownID
+    /// Lane of the login Claude Code is using now: the Keychain token's owner
+    /// once the endpoint has named it, else `.claude.json` (honours
+    /// CLAUDE_CONFIG_DIR like the relay does), which drifts between logins.
+    var activeClaudeLaneID: String {
+        tokenLaneID
+            ?? AccountDetection.activeClaudeEmail().map { config.lane(forEmail: $0).id }
+            ?? Lane.unknownID
     }
 
     /// Codex reports authoritative usage in its rollouts: the last `token_count`

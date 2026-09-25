@@ -27,6 +27,16 @@ final class ClaudeUsageAPITests: XCTestCase {
         XCTAssertEqual(w.weeklySplits.first?.percent, 37)
     }
 
+    func testOwnerComesFromProfileAccountEmail() {
+        let profile: [String: Any] = [
+            "account": ["uuid": "u1", "email": " Alex@Acme.Example ", "display_name": "Alex"],
+            "organization": ["name": "Acme", "organization_type": "claude_team"],
+        ]
+        XCTAssertEqual(ClaudeUsageAPI.parseOwner(profile), "alex@acme.example", "matched the way subscriptions store emails")
+        XCTAssertNil(ClaudeUsageAPI.parseOwner(["account": ["email": ""]]))
+        XCTAssertNil(ClaudeUsageAPI.parseOwner(["organization": ["name": "Acme"]]))
+    }
+
     func testLegacyModelKeysBecomeSplitsWhenNoLimitsArray() throws {
         let obj: [String: Any] = [
             "five_hour": ["utilization": 5, "resets_at": iso(3600)],
